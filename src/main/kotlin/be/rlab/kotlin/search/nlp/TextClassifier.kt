@@ -1,6 +1,5 @@
 package be.rlab.kotlin.search.nlp
 
-import be.rlab.augusto.nlp.model.*
 import be.rlab.kotlin.search.IndexManager
 import be.rlab.kotlin.search.model.*
 import org.apache.lucene.search.spell.JaroWinklerDistance

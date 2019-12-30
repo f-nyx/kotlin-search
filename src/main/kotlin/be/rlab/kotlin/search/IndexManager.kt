@@ -1,7 +1,6 @@
 package be.rlab.kotlin.search
 
 import be.rlab.kotlin.search.Hashes.getLanguage
-import be.rlab.augusto.nlp.model.*
 import be.rlab.kotlin.search.model.*
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.document.StringField
