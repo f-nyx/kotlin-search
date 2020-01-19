@@ -1,7 +1,13 @@
-package be.rlab.kotlin.search.nlp
+package be.rlab.nlp
 
-import be.rlab.kotlin.search.IndexManager
-import be.rlab.kotlin.search.model.*
+import be.rlab.nlp.model.ClassificationResult
+import be.rlab.nlp.model.Language
+import be.rlab.nlp.model.TrainingDataSet
+import be.rlab.search.IndexManager
+import be.rlab.search.model.Document
+import be.rlab.search.model.Field
+import be.rlab.search.model.Index
+import be.rlab.search.model.PaginatedResult
 import org.apache.lucene.search.spell.JaroWinklerDistance
 
 /** This class allows to train and query text classifiers.

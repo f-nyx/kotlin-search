@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.search.model
 
 /** Index supported field types.
  */

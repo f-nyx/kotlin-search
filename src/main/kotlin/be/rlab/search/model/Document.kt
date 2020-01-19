@@ -1,6 +1,7 @@
-package be.rlab.kotlin.search.model
+package be.rlab.search.model
 
-import be.rlab.kotlin.search.Hashes.generateId
+import be.rlab.nlp.model.Language
+import be.rlab.search.Hashes.generateId
 import java.util.*
 
 /** Represents a document in the Lucene index.

@@ -1,7 +1,7 @@
-package be.rlab.kotlin.search.nlp
+package be.rlab.nlp
 
-import be.rlab.kotlin.search.model.Language
-import be.rlab.kotlin.search.model.Token
+import be.rlab.nlp.model.Language
+import be.rlab.nlp.model.Token
 import org.apache.lucene.analysis.CharArraySet
 import org.apache.lucene.analysis.TokenStream
 import org.apache.lucene.analysis.core.StopFilter

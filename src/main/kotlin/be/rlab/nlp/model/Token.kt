@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.nlp.model
 
 import org.apache.commons.lang3.builder.EqualsBuilder
 import org.apache.commons.lang3.builder.HashCodeBuilder

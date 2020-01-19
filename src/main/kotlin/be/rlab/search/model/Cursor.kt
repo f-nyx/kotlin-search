@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.search.model
 
 data class Cursor(
     val docId: Int,

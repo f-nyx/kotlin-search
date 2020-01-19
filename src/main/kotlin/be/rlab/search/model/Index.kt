@@ -1,5 +1,6 @@
-package be.rlab.kotlin.search.model
+package be.rlab.search.model
 
+import be.rlab.nlp.model.Language
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.index.IndexReader
 import org.apache.lucene.index.IndexWriter

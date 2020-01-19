@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.nlp.model
 
 enum class Language(val code: String) {
     ARABIC("ar"),

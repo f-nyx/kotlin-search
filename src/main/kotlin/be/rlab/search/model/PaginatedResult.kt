@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.search.model
 
 /** Represents a set of paginated search results.
  *

@@ -1,4 +1,6 @@
-package be.rlab.kotlin.search.model
+package be.rlab.nlp.model
+
+import be.rlab.nlp.model.Language
 
 data class TrainingDataSet(
     val language: Language,

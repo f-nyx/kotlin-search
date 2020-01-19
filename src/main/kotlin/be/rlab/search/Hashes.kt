@@ -1,6 +1,6 @@
-package be.rlab.kotlin.search
+package be.rlab.search
 
-import be.rlab.kotlin.search.model.Language
+import be.rlab.nlp.model.Language
 import org.apache.commons.codec.digest.MurmurHash3
 import java.util.*
 

@@ -1,7 +1,7 @@
-package be.rlab.kotlin.search
+package be.rlab.search
 
-import be.rlab.kotlin.search.nlp.StopWordTokenizer
-import be.rlab.kotlin.search.model.Language
+import be.rlab.nlp.StopWordTokenizer
+import be.rlab.nlp.model.Language
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.analysis.CharArraySet
 import org.apache.lucene.analysis.bg.BulgarianAnalyzer

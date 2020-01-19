@@ -1,4 +1,4 @@
-package be.rlab.kotlin.search.model
+package be.rlab.nlp.model
 
 /** Represents a text classification result.
  * It is used by the [be.rlab.augusto.nlp.TextClassifier] to retrieve all matching categories and

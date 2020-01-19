@@ -1,6 +1,6 @@
-package be.rlab.kotlin.search.nlp
+package be.rlab.nlp
 
-import be.rlab.kotlin.search.model.Language
+import be.rlab.nlp.model.Language
 import org.tartarus.snowball.SnowballProgram
 import org.tartarus.snowball.ext.EnglishStemmer
 import org.tartarus.snowball.ext.PortugueseStemmer
