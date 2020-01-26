@@ -1,14 +1,12 @@
 package be.rlab.nlp
 
+import be.rlab.nlp.Distance.jaroWinkler
 import be.rlab.nlp.model.ClassificationResult
 import be.rlab.nlp.model.Language
 import be.rlab.nlp.model.TrainingDataSet
 import be.rlab.search.IndexManager
-import be.rlab.search.model.Document
-import be.rlab.search.model.Field
 import be.rlab.search.model.Index
 import be.rlab.search.model.PaginatedResult
-import org.apache.lucene.search.spell.JaroWinklerDistance
 
 /** This class allows to train and query text classifiers.
  *
@@ -45,13 +43,10 @@ class TextClassifier(
             .removeStopWords()
             .normalize()
 
-        indexManager.index(
-            Document.new(
-                namespace, language,
-                Field.text(CATEGORY_FIELD, category),
-                Field.text(TEXT_FIELD, normalizedText)
-            )
-        )
+        indexManager.index(namespace, language) {
+            text(CATEGORY_FIELD, category)
+            text(TEXT_FIELD, normalizedText)
+        }
     }
 
     /** Trains the classifier from data sets.
@@ -89,12 +84,9 @@ class TextClassifier(
         language: Language
     ): List<ClassificationResult> {
 
-        val features: PaginatedResult = indexManager.search(
-            namespace = namespace,
-            fields = mapOf(CATEGORY_FIELD to "*"),
-            language = language,
-            limit = MAX_FEATURES
-        )
+        val features: PaginatedResult = indexManager.search(namespace, language, limit = MAX_FEATURES) {
+            wildcard(CATEGORY_FIELD, "*")
+        }
 
         val normalizedText: String = Normalizer(text, language)
             .applyStemming()
@@ -102,29 +94,17 @@ class TextClassifier(
             .normalize()
 
         return features.results.groupBy { document ->
-            document[CATEGORY_FIELD]!!
+            val value: String = document[CATEGORY_FIELD]!!
+            value
         }.map { (category, documents) ->
             val distance: Float = documents.map { document ->
-                distance(document[TEXT_FIELD]!!, normalizedText)
-            }.max() ?: 0.toFloat()
+                jaroWinkler(document[TEXT_FIELD]!!, normalizedText)
+            }.max() ?: 0.0F
 
             ClassificationResult(
                 assignedClass = category,
                 score = distance.toDouble()
             )
         }
-    }
-
-    /** Calculates the Jaro-Winkler distance between two texts.
-     * This algorithm works very well on terms that share the same prefixes.
-     * @param text A text to measure.
-     * @param otherText Other text to measure.
-     * @return the distance as a float between 0 and 1.
-     */
-    fun distance(
-        text: String,
-        otherText: String
-    ): Float {
-        return JaroWinklerDistance().getDistance(text, otherText)
     }
 }

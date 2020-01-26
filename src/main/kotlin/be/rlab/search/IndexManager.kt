@@ -3,17 +3,17 @@ package be.rlab.search
 import be.rlab.nlp.model.Language
 import be.rlab.search.Hashes.getLanguage
 import be.rlab.search.model.*
+import be.rlab.search.model.Field
+import be.rlab.search.model.FieldType
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.document.StringField
-import org.apache.lucene.document.TextField
+import org.apache.lucene.document.*
+import org.apache.lucene.document.Field.Store
 import org.apache.lucene.index.*
 import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import java.io.File
 import org.apache.lucene.document.Document as LuceneDocument
-import org.apache.lucene.document.Field as LuceneField
-import org.apache.lucene.document.FieldType as LuceneFieldType
 
 /** Multi-language full-text search index.
  *
@@ -38,15 +38,6 @@ class IndexManager(indexPath: String) {
         const val DEFAULT_LIMIT: Int = 1000
         const val ID_FIELD: String = "id"
         const val NAMESPACE_FIELD: String = "namespace"
-
-        private val TEXT_FIELD = LuceneFieldType(TextField.TYPE_STORED).apply {
-            setStoreTermVectors(true)
-            setStoreTermVectorOffsets(true)
-            setStoreTermVectorPositions(true)
-        }
-        private val STRING_FIELD = LuceneFieldType(StringField.TYPE_STORED).apply {
-            setStoreTermVectors(true)
-        }
         private const val FIELD_TYPE: String = "type"
     }
 
@@ -81,30 +72,39 @@ class IndexManager(indexPath: String) {
     }
 
     /** Analyzes and indexes a document.
+     *
+     * @param namespace Document namespace.
+     * @param language Document language.
+     * @param builder Callback to build the document using a [DocumentBuilder].
+     */
+    fun index(
+        namespace: String,
+        language: Language,
+        builder: DocumentBuilder.() -> Unit
+    ) {
+        index(DocumentBuilder.new(namespace, language, builder).build())
+    }
+
+    /** Analyzes and indexes a document.
      * @param document Document to index.
      */
     fun index(document: Document) {
         val indexWriter: IndexWriter = indexes.getValue(document.language).indexWriter
 
         indexWriter.addDocument(LuceneDocument().apply {
-            add(LuceneField(
-                ID_FIELD, document.id,
-                STRING_FIELD
-            ))
-            add(LuceneField(
-                NAMESPACE_FIELD, document.namespace,
-                STRING_FIELD
-            ))
+            add(StringField(ID_FIELD, document.id, Store.YES))
+            add(StringField(NAMESPACE_FIELD, document.namespace, Store.YES))
 
             document.fields.forEach { field ->
-                val fieldType = when(field.type) {
-                    FieldType.STRING -> STRING_FIELD
-                    FieldType.TEXT -> TEXT_FIELD
-                }
-                add(LuceneField(field.name, field.value, fieldType))
-                add(LuceneField("${field.name}!!$FIELD_TYPE", field.type.name,
-                    STRING_FIELD
-                ))
+                add(when(field.type) {
+                    FieldType.STRING -> StringField(field.name, field.value as String, Store.YES)
+                    FieldType.TEXT -> TextField(field.name, field.value as String, Store.YES)
+                    FieldType.INT -> IntPoint(field.name, *(field.value as IntArray))
+                    FieldType.LONG -> LongPoint(field.name, *(field.value as LongArray))
+                    FieldType.FLOAT -> FloatPoint(field.name, *(field.value as FloatArray))
+                    FieldType.DOUBLE -> DoublePoint(field.name, *(field.value as DoubleArray))
+                })
+                add(StringField("${field.name}!!$FIELD_TYPE", field.type.name, Store.YES))
             }
         })
     }
@@ -130,31 +130,24 @@ class IndexManager(indexPath: String) {
      * in a [PaginatedResult], this method resumes the search from there.
      *
      * @param namespace Documents namespace.
-     * @param fields Fields search criteria.
+     * @param language Language of the index to search.
      * @param cursor Cursor to resume a paginated search.
      * @param limit Max number of results to retrieve.
      */
     fun search(
         namespace: String,
-        fields: Map<String, String>,
         language: Language,
         cursor: Cursor = Cursor.first(),
-        limit: Int = DEFAULT_LIMIT
+        limit: Int = DEFAULT_LIMIT,
+        builder: QueryBuilder.() -> Unit
     ): PaginatedResult {
-        val query: BooleanQuery = fields.entries.fold(
-            BooleanQuery.Builder()
-        ) { query, (fieldName, value) ->
-            query.add(WildcardQuery(Term(fieldName, value)), BooleanClause.Occur.MUST)
-        }.add(
-            TermQuery(Term(NAMESPACE_FIELD, namespace)),
-            BooleanClause.Occur.MUST
-        ).build()
+        val query = QueryBuilder.query(namespace, language, builder)
 
-        return with(searcher(language)) {
+        return with(searcher(query.language)) {
             if (cursor.isFirst()) {
-                transform(this, search(query, limit), cursor)
+                transform(this, search(query.build(), limit), cursor)
             } else {
-                transform(this, searchAfter(scoreDoc(cursor), query, limit))
+                transform(this, searchAfter(scoreDoc(cursor), query.build(), limit))
             }
         }
     }
@@ -198,10 +191,10 @@ class IndexManager(indexPath: String) {
                     field.name() != ID_FIELD &&
                             field.name() != NAMESPACE_FIELD &&
                             !field.name().contains("!!")
-                }.map { field ->
+                }.map { field: IndexableField ->
                     Field(
                         name = field.name(),
-                        value = field.stringValue(),
+                        value = field.numericValue() ?: field.stringValue(),
                         type = FieldType.valueOf(luceneDoc.getField("${field.name()}!!$FIELD_TYPE").stringValue())
                     )
                 }

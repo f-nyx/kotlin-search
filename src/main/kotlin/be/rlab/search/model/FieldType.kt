@@ -8,5 +8,13 @@ enum class FieldType {
     STRING,
     /** A field that is stored and tokenized.
      */
-    TEXT
+    TEXT,
+    /** Integer value for exact/range queries. */
+    INT,
+    /** Long value for exact/range queries. */
+    LONG,
+    /** Float value for exact/range queries. */
+    FLOAT,
+    /** Double value for exact/range queries. */
+    DOUBLE
 }

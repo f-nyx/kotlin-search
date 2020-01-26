@@ -31,9 +31,9 @@ data class Document(
             )
     }
 
-    operator fun get(name: String): String? {
+    inline operator fun<reified T> get(name: String): T? {
         return fields.find { field ->
             field.name == name
-        }?.value
+        }?.value as T
     }
 }
