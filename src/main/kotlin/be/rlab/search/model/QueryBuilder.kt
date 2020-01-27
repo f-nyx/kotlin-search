@@ -14,11 +14,9 @@ class QueryBuilder private constructor (
     companion object {
         fun query(
             namespace: String,
-            language: Language,
-            callback: QueryBuilder.() -> Unit
+            language: Language
         ): QueryBuilder {
             val builder = QueryBuilder(language)
-            callback(builder)
 
             return builder.apply {
                 term(IndexManager.NAMESPACE_FIELD, namespace)
@@ -31,35 +29,39 @@ class QueryBuilder private constructor (
     fun wildcard(
         fields: Map<String, String>,
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST
-    ) {
+    ): QueryBuilder {
         root = fields.entries.fold(root) { query, (fieldName, value) ->
             query.add(WildcardQuery(Term(fieldName, value)), occur)
         }
+        return this
     }
 
     fun wildcard(
         fieldName: String,
         value: String,
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST
-    ) {
+    ): QueryBuilder {
         root = root.add(WildcardQuery(Term(fieldName, value)), occur)
+        return this
     }
 
     fun term(
         fields: Map<String, String>,
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST
-    ) {
+    ): QueryBuilder {
         root = fields.entries.fold(root) { query, (fieldName, value) ->
             query.add(TermQuery(Term(fieldName, value)), occur)
         }
+        return this
     }
 
     fun term(
         fieldName: String,
         value: String,
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST
-    ) {
+    ): QueryBuilder {
         root = root.add(TermQuery(Term(fieldName, value)), occur)
+        return this
     }
 
     fun build(): Query {

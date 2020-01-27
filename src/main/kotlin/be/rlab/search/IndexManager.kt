@@ -35,10 +35,13 @@ import org.apache.lucene.document.Document as LuceneDocument
  */
 class IndexManager(indexPath: String) {
     companion object {
-        const val DEFAULT_LIMIT: Int = 1000
-        const val ID_FIELD: String = "id"
-        const val NAMESPACE_FIELD: String = "namespace"
+        internal const val DEFAULT_LIMIT: Int = 1000
+        internal const val ID_FIELD: String = "id"
+        internal const val NAMESPACE_FIELD: String = "namespace"
         private const val FIELD_TYPE: String = "type"
+        private val NUMERIC_TYPES: List<FieldType> = listOf(
+            FieldType.INT, FieldType.LONG, FieldType.FLOAT, FieldType.DOUBLE
+        )
     }
 
     /** Indexes per language. */
@@ -96,14 +99,36 @@ class IndexManager(indexPath: String) {
             add(StringField(NAMESPACE_FIELD, document.namespace, Store.YES))
 
             document.fields.forEach { field ->
-                add(when(field.type) {
-                    FieldType.STRING -> StringField(field.name, field.value as String, Store.YES)
-                    FieldType.TEXT -> TextField(field.name, field.value as String, Store.YES)
+                val newField = when(field.type) {
+                    FieldType.STRING -> StringField(field.name, field.value as String, if (field.stored) {
+                        Store.YES
+                    } else {
+                        Store.NO
+                    })
+                    FieldType.TEXT -> TextField(field.name, field.value as String, if (field.stored) {
+                        Store.YES
+                    } else {
+                        Store.NO
+                    })
                     FieldType.INT -> IntPoint(field.name, *(field.value as IntArray))
                     FieldType.LONG -> LongPoint(field.name, *(field.value as LongArray))
                     FieldType.FLOAT -> FloatPoint(field.name, *(field.value as FloatArray))
                     FieldType.DOUBLE -> DoublePoint(field.name, *(field.value as DoubleArray))
-                })
+                }
+
+                if (field.stored && NUMERIC_TYPES.contains(field.type)) {
+                    newField.numericValue()?.let { value ->
+                        add(when (newField) {
+                            is IntPoint -> StoredField(field.name, value.toInt())
+                            is LongPoint -> StoredField(field.name, value.toLong())
+                            is FloatPoint -> StoredField(field.name, value.toFloat())
+                            is DoublePoint -> StoredField(field.name, value.toDouble())
+                            else -> throw RuntimeException("unknown numeric field type: ${field.type}")
+                        })
+                    }
+                }
+
+                add(newField)
                 add(StringField("${field.name}!!$FIELD_TYPE", field.type.name, Store.YES))
             }
         })
@@ -122,9 +147,7 @@ class IndexManager(indexPath: String) {
 
     /** Searches for documents in a specific language.
      *
-     * The search is performed over fields. The [fields] key is the field name and the value is the search
-     * criteria for that field. Search criteria supports wildcards. For wildcards reference look at
-     * [Lucene documentation](https://lucene.apache.org/core/8_3_1/core/org/apache/lucene/search/WildcardQuery.html).
+     * The query builder provides a flexible interface to build Lucene queries.
      *
      * The cursor and the limit allows to paginate the search results. If you provide a cursor previously returned
      * in a [PaginatedResult], this method resumes the search from there.
@@ -141,7 +164,9 @@ class IndexManager(indexPath: String) {
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
     ): PaginatedResult {
-        val query = QueryBuilder.query(namespace, language, builder)
+        val query = QueryBuilder.query(namespace, language).apply {
+            builder(this)
+        }
 
         return with(searcher(query.language)) {
             if (cursor.isFirst()) {
@@ -150,6 +175,15 @@ class IndexManager(indexPath: String) {
                 transform(this, searchAfter(scoreDoc(cursor), query.build(), limit))
             }
         }
+    }
+
+    fun find(
+        namespace: String,
+        language: Language,
+        limit: Int = DEFAULT_LIMIT,
+        builder: QueryBuilder.() -> Unit
+    ): List<Document> {
+        return search(namespace, language, limit = limit, builder = builder).results
     }
 
     /** Synchronizes and writes all pending changes to disk.
@@ -189,12 +223,15 @@ class IndexManager(indexPath: String) {
                 language = getLanguage(id),
                 fields = luceneDoc.fields.filter { field ->
                     field.name() != ID_FIELD &&
-                            field.name() != NAMESPACE_FIELD &&
-                            !field.name().contains("!!")
+                    field.name() != NAMESPACE_FIELD &&
+                    !field.name().contains("!!")
                 }.map { field: IndexableField ->
                     Field(
                         name = field.name(),
-                        value = field.numericValue() ?: field.stringValue(),
+                        value = field.numericValue()
+                            ?: field.stringValue()
+                            ?: field.binaryValue()
+                            ?: field.readerValue(),
                         type = FieldType.valueOf(luceneDoc.getField("${field.name()}!!$FIELD_TYPE").stringValue())
                     )
                 }

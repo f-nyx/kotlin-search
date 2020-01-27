@@ -26,19 +26,23 @@ class DocumentBuilder private constructor (
 
     /** Creates a new text field.
      *
+     * By default text fields are indexed and stored.
+     *
      * @param name Field name.
      * @param value Field value.
      */
     fun text(
         name: String,
         value: String
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.TEXT)
+        return fields.last()
     }
 
     /** Creates a new string field.
      *
      * String fields are saved as single terms and they're not indexed.
+     * By default String fields are stored.
      *
      * @param name Field name.
      * @param value Field value.
@@ -46,11 +50,13 @@ class DocumentBuilder private constructor (
     fun string(
         name: String,
         value: String
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.STRING)
+        return fields.last()
     }
 
     /** Creates a new int field.
+     * By default numeric fields are not stored.
      *
      * @param name Field name.
      * @param value Field value.
@@ -58,11 +64,13 @@ class DocumentBuilder private constructor (
     fun int(
         name: String,
         vararg value: Int
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.INT)
+        return fields.last()
     }
 
     /** Creates a new long field.
+     * By default numeric fields are not stored.
      *
      * @param name Field name.
      * @param value Field value.
@@ -70,11 +78,13 @@ class DocumentBuilder private constructor (
     fun long(
         name: String,
         vararg value: Long
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.LONG)
+        return fields.last()
     }
 
     /** Creates a new float field.
+     * By default numeric fields are not stored.
      *
      * @param name Field name.
      * @param value Field value.
@@ -82,11 +92,13 @@ class DocumentBuilder private constructor (
     fun float(
         name: String,
         vararg value: Float
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.FLOAT)
+        return fields.last()
     }
 
     /** Creates a new double field.
+     * By default numeric fields are not stored.
      *
      * @param name Field name.
      * @param value Field value.
@@ -94,8 +106,26 @@ class DocumentBuilder private constructor (
     fun double(
         name: String,
         vararg value: Double
-    ) {
+    ): Field {
         fields += Field(name, value, FieldType.DOUBLE)
+        return fields.last()
+    }
+
+    /** Stores the specified field in the index.
+     * @param field Field to store.
+     */
+    fun store(field: Field): Field {
+        val storedField = field.store()
+
+        fields.replaceAll { existingField ->
+            if (storedField.name == existingField.name) {
+                storedField
+            } else {
+                existingField
+            }
+        }
+
+        return storedField
     }
 
     /** Builds the document.
