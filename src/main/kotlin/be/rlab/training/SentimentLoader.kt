@@ -106,8 +106,12 @@ class SentimentLoader(
         positive: Int
     ) {
         int(SENTIMENT_FIELD, negative, positive)
-        store(int(SENTIMENT_NEG_FIELD, negative))
-        store(int(SENTIMENT_POS_FIELD, positive))
+        int(SENTIMENT_NEG_FIELD, negative) {
+            store()
+        }
+        int(SENTIMENT_POS_FIELD, positive) {
+            store()
+        }
     }
 
     private fun file(name: String): File {

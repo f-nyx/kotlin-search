@@ -35,7 +35,7 @@ import org.apache.lucene.document.Document as LuceneDocument
  */
 class IndexManager(indexPath: String) {
     companion object {
-        internal const val DEFAULT_LIMIT: Int = 1000
+        const val DEFAULT_LIMIT: Int = 1000
         internal const val ID_FIELD: String = "id"
         internal const val NAMESPACE_FIELD: String = "namespace"
         private const val FIELD_TYPE: String = "type"
@@ -92,7 +92,8 @@ class IndexManager(indexPath: String) {
      * @param document Document to index.
      */
     fun index(document: Document) {
-        val indexWriter: IndexWriter = indexes.getValue(document.language).indexWriter
+        val language: Language = getLanguage(document.id)
+        val indexWriter: IndexWriter = indexes.getValue(language).indexWriter
 
         indexWriter.addDocument(LuceneDocument().apply {
             add(StringField(ID_FIELD, document.id, Store.YES))
@@ -220,7 +221,6 @@ class IndexManager(indexPath: String) {
             Document(
                 id = id,
                 namespace = luceneDoc.getField(NAMESPACE_FIELD).stringValue(),
-                language = getLanguage(id),
                 fields = luceneDoc.fields.filter { field ->
                     field.name() != ID_FIELD &&
                     field.name() != NAMESPACE_FIELD &&

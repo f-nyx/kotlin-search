@@ -22,6 +22,19 @@ class DocumentBuilder private constructor (
         }
     }
 
+    class FieldModifiers(
+        internal var stored: Boolean,
+        internal var indexed: Boolean
+    ) {
+        fun store(stored: Boolean = true) {
+            this.stored = stored
+        }
+
+        fun index(indexed: Boolean = true) {
+            this.indexed = indexed
+        }
+    }
+
     private val fields: MutableList<Field> = mutableListOf()
 
     /** Creates a new text field.
@@ -30,13 +43,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun text(
         name: String,
-        value: String
-    ): Field {
-        fields += Field(name, value, FieldType.TEXT)
-        return fields.last()
+        value: String,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.TEXT), callback)
+        return this
     }
 
     /** Creates a new string field.
@@ -46,13 +61,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun string(
         name: String,
-        value: String
-    ): Field {
-        fields += Field(name, value, FieldType.STRING)
-        return fields.last()
+        value: String,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.STRING), callback)
+        return this
     }
 
     /** Creates a new int field.
@@ -60,13 +77,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun int(
         name: String,
-        vararg value: Int
-    ): Field {
-        fields += Field(name, value, FieldType.INT)
-        return fields.last()
+        vararg value: Int,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.INT), callback)
+        return this
     }
 
     /** Creates a new long field.
@@ -74,13 +93,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun long(
         name: String,
-        vararg value: Long
-    ): Field {
-        fields += Field(name, value, FieldType.LONG)
-        return fields.last()
+        vararg value: Long,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.LONG), callback)
+        return this
     }
 
     /** Creates a new float field.
@@ -88,13 +109,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun float(
         name: String,
-        vararg value: Float
-    ): Field {
-        fields += Field(name, value, FieldType.FLOAT)
-        return fields.last()
+        vararg value: Float,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.FLOAT), callback)
+        return this
     }
 
     /** Creates a new double field.
@@ -102,30 +125,15 @@ class DocumentBuilder private constructor (
      *
      * @param name Field name.
      * @param value Field value.
+     * @param callback Callback to set field modifiers.
      */
     fun double(
         name: String,
-        vararg value: Double
-    ): Field {
-        fields += Field(name, value, FieldType.DOUBLE)
-        return fields.last()
-    }
-
-    /** Stores the specified field in the index.
-     * @param field Field to store.
-     */
-    fun store(field: Field): Field {
-        val storedField = field.store()
-
-        fields.replaceAll { existingField ->
-            if (storedField.name == existingField.name) {
-                storedField
-            } else {
-                existingField
-            }
-        }
-
-        return storedField
+        vararg value: Double,
+        callback: FieldModifiers.() -> Unit = {}
+    ): DocumentBuilder {
+        fields += withModifiers(Field(name, value, FieldType.DOUBLE), callback)
+        return this
     }
 
     /** Builds the document.
@@ -134,8 +142,24 @@ class DocumentBuilder private constructor (
         return Document(
             id = generateId(UUID.randomUUID(), language),
             namespace = namespace,
-            language = language,
             fields = fields.toList()
+        )
+    }
+
+    private fun withModifiers(
+        field: Field,
+        callback: FieldModifiers.() -> Unit
+    ): Field {
+        val modifiers = FieldModifiers(
+            stored = field.stored,
+            indexed = field.indexed
+        )
+
+        callback(modifiers)
+
+        return field.copy(
+            stored = modifiers.stored,
+            indexed = modifiers.indexed
         )
     }
 }
