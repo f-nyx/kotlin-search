@@ -7,6 +7,34 @@
     <packaging>jar</packaging>
     <version>1.0.0-SNAPSHOT</version>
 
+    <name>Kotlin Search</name>
+    <description>
+        Kotlin Search provides an embedded, multi-language full-text search solution based on Lucene.
+    </description>
+    <url>https://github.com/f-nyx/kotlin-search</url>
+    <licenses>
+        <license>
+            <name>GPL Version 2.0</name>
+            <url>https://www.gnu.org/licenses/old-licenses/gpl-2.0.html</url>
+            <distribution>repo</distribution>
+            <comments>Free Software License</comments>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <id>nyx</id>
+            <name>nyx</name>
+            <email>dnyx@riseup.net</email>
+            <organization>R'lyeh Hacklab</organization>
+            <organizationUrl>https://rlab.be</organizationUrl>
+            <roles>
+                <role>developer</role>
+            </roles>
+            <timezone>America/Argentina/Buenos_Aires</timezone>
+        </developer>
+    </developers>
+
     <properties>
         <!-- Maven -->
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
