@@ -142,21 +142,22 @@ class IndexManager(indexPath: String) {
     fun get(documentId: String): Document? {
         return with(searcher(getLanguage(documentId))) {
             val topDocs = search(TermQuery(Term(ID_FIELD, documentId)), 1)
-            transform(this, topDocs).results.firstOrNull()
+            transform(this, topDocs).docs.firstOrNull()
         }
     }
 
-    /** Searches for documents in a specific language.
+    /** Search for documents in a specific language.
      *
      * The query builder provides a flexible interface to build Lucene queries.
      *
-     * The cursor and the limit allows to paginate the search results. If you provide a cursor previously returned
-     * in a [PaginatedResult], this method resumes the search from there.
+     * The cursor and the limit allows to paginate the search results. If you provide a cursor returned
+     * in a previous [SearchResult], this method resumes the search from there.
      *
      * @param namespace Documents namespace.
      * @param language Language of the index to search.
      * @param cursor Cursor to resume a paginated search.
      * @param limit Max number of results to retrieve.
+     * @param builder Query builder.
      */
     fun search(
         namespace: String,
@@ -164,27 +165,57 @@ class IndexManager(indexPath: String) {
         cursor: Cursor = Cursor.first(),
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
-    ): PaginatedResult {
+    ): SearchResult {
         val query = QueryBuilder.query(namespace, language).apply {
             builder(this)
         }
 
         return with(searcher(query.language)) {
             if (cursor.isFirst()) {
-                transform(this, search(query.build(), limit), cursor)
+                transform(this, search(query.build(), limit))
             } else {
-                transform(this, searchAfter(scoreDoc(cursor), query.build(), limit))
+                val scoreDoc = ScoreDoc(
+                    cursor.docId,
+                    cursor.score,
+                    cursor.shardIndex
+                )
+                transform(this, searchAfter(scoreDoc, query.build(), limit))
             }
         }
     }
 
+    /** Search for documents in a specific language.
+     *
+     * It produces a sequence that goes through all search results. The [limit] is the
+     * size of each [SearchResult]. It will query the index until it returns no more results.
+     *
+     * @param namespace Documents namespace.
+     * @param language Language of the index to search.
+     * @param limit Max number of results to retrieve.
+     * @param builder Query builder.
+     */
     fun find(
         namespace: String,
         language: Language,
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
-    ): List<Document> {
-        return search(namespace, language, limit = limit, builder = builder).results
+    ): Sequence<Document> {
+        var result: SearchResult = search(namespace, language, Cursor.first(), limit, builder)
+        var docs: Iterator<Document> = result.docs.iterator()
+
+        fun next(): Document? = when {
+            docs.hasNext() -> docs.next()
+            !docs.hasNext() && result.next != null -> {
+                result = search(namespace, language, result.next!!, limit, builder)
+                docs = result.docs.iterator()
+                next()
+            }
+            else -> null
+        }
+
+        return generateSequence {
+            next()
+        }
     }
 
     /** Synchronizes and writes all pending changes to disk.
@@ -210,9 +241,8 @@ class IndexManager(indexPath: String) {
 
     private fun transform(
         searcher: IndexSearcher,
-        topDocs: TopDocs,
-        cursor: Cursor? = null
-    ): PaginatedResult {
+        topDocs: TopDocs
+    ): SearchResult {
 
         val resolvedDocs: List<Document> = topDocs.scoreDocs.map { scoreDoc ->
             val luceneDoc = searcher.doc(scoreDoc.doc)
@@ -238,10 +268,9 @@ class IndexManager(indexPath: String) {
             )
         }
 
-        return PaginatedResult.new(
+        return SearchResult.new(
             results = resolvedDocs,
             total = topDocs.totalHits.value,
-            previous = cursor,
             next = if (resolvedDocs.isNotEmpty()) {
                 val nextDoc = topDocs.scoreDocs.last()
                 Cursor(
@@ -257,14 +286,6 @@ class IndexManager(indexPath: String) {
 
     private fun searcher(language: Language): IndexSearcher {
         return IndexSearcher(indexReader(language))
-    }
-
-    private fun scoreDoc(cursor: Cursor): ScoreDoc {
-        return ScoreDoc(
-            cursor.docId,
-            cursor.score,
-            cursor.shardIndex
-        )
     }
 
     private fun indexReader(language: Language): IndexReader {

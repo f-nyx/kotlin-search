@@ -24,7 +24,7 @@ abstract class DataSetLoader(
 
         val exists = indexManager.find(dataSet.namespace, dataSet.language, limit = 1) {
             term("$dataSetName::$PROBE_FIELD", "true")
-        }.isNotEmpty()
+        }.toList().isNotEmpty()
 
         if (exists) {
             logger.info("data set $dataSetName is already loaded")

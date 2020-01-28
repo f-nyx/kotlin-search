@@ -6,7 +6,7 @@ import be.rlab.nlp.model.Language
 import be.rlab.nlp.model.TrainingDataSet
 import be.rlab.search.IndexManager
 import be.rlab.search.model.Index
-import be.rlab.search.model.PaginatedResult
+import be.rlab.search.model.SearchResult
 
 /** This class allows to train and query text classifiers.
  *
@@ -84,7 +84,7 @@ class TextClassifier(
         language: Language
     ): List<ClassificationResult> {
 
-        val features: PaginatedResult = indexManager.search(namespace, language, limit = MAX_FEATURES) {
+        val features: SearchResult = indexManager.search(namespace, language, limit = MAX_FEATURES) {
             wildcard(CATEGORY_FIELD, "*")
         }
 
@@ -93,7 +93,7 @@ class TextClassifier(
             .removeStopWords()
             .normalize()
 
-        return features.results.groupBy { document ->
+        return features.docs.groupBy { document ->
             val value: String = document[CATEGORY_FIELD]!!
             value
         }.map { (category, documents) ->

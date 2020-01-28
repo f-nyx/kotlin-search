@@ -142,11 +142,12 @@ Faceted search is not supported yet.
 
 ### Pagination
 
-By default the ```indexManager.search``` operation limits results up to ```IndexManager.DEFAULT_LIMIT```
-results. The operation returns a
-[PaginatedResult](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/model/PaginatedResult.kt)
-that contains the search results for the first page and a cursor to the previous and next pages.
+```indexManager.search``` search for documents in the index. By default it limits results up to
+```IndexManager.DEFAULT_LIMIT``` documents. The operation returns a
+[SearchResult](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/model/SearchResult.kt)
+that contains the documents in the first page and a cursor to the next page in the recordset. You must call
+```indexManager.search``` providing the cursor to search for the next page. This pagination strategy is useful when
+you have to defer the search in order to continue later.
 
-You can call ```indexManager.search``` providing a cursor to search for the next or previous pages.
-
-If you don't need pagination, you can use ```indexManager.find``` to get the full list of results.
+If you don't need a deferred pagination, you can use ```indexManager.find``` to get the full list of results as
+a Sequence. It will query the index as many times as required until the recordset has no more documents.
