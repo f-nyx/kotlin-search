@@ -21,7 +21,7 @@ This is available on Maven Central Repository. It can be added using the followi
 <dependency>
     <groupId>be.rlab</groupId>
     <artifactId>kotlin-search</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
@@ -126,6 +126,10 @@ The DSL supports the following type of queries:
 |  wildcard  |   string, text   |  MUST
 |   regex    |   string, text   |  MUST
 |   fuzzy    |   string, text   |  MUST
+|   phrase   |   string, text   |  MUST
+
+If you need to build a custom query, the ```QueryBuilder``` providers the ```custom()``` method that receives
+the current ```BooleanQuery``` in construction.
 
 All queries have additional parameters that are initialized to the default Lucene values. If you need to
 boost a query you can apply the boost as a modifier:
@@ -139,6 +143,23 @@ indexManager.search("players", Language.SPANISH) {
 ```
 
 Faceted search is not supported yet.
+
+### Query parsing
+
+The ```QueryBuilder``` also supports parsing Lucene queries using the
+[QueryParser](https://lucene.apache.org/core/8_0_0/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html)
+syntax.
+
+```
+val indexManager = IndexManager("/tmp/lucene-index")
+
+indexManager.search("players", Language.SPANISH) {
+    parse("firstName", "age:[22 TO 35] AND Juan")
+}
+```
+The first parameter of the ```parse()``` method is the default field if no field is specified in the query. For
+instance, in the previous query, it will search for all persons with first name ```Juan``` with ages between
+22 and 35 years. For full syntax documentation take a look at the [Lucene documentation](https://lucene.apache.org/core/8_0_0/queryparser/org/apache/lucene/queryparser/classic/package-summary.html#package.description).
 
 ### Pagination
 
