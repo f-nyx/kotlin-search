@@ -146,6 +146,26 @@ class IndexManager(indexPath: String) {
         }
     }
 
+    /** Counts search results.
+     *
+     * @param namespace Documents namespace.
+     * @param language Language of the index to search.
+     * @param builder Query builder.
+     */
+    fun count(
+        namespace: String,
+        language: Language,
+        builder: QueryBuilder.() -> Unit
+    ): Int {
+        val query = QueryBuilder.query(namespace, language).apply {
+            builder(this)
+        }
+
+        return with(searcher(query.language)) {
+            count(query.build())
+        }
+    }
+
     /** Search for documents in a specific language.
      *
      * The query builder provides a flexible interface to build Lucene queries.

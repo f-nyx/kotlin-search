@@ -36,6 +36,15 @@ class DocumentBuilder private constructor (
     }
 
     private val fields: MutableList<Field> = mutableListOf()
+    private var id: UUID = UUID.randomUUID()
+
+    /** Sets the document identifier.
+     * @param docId Unique document identifier.
+     */
+    fun id(docId: UUID): DocumentBuilder {
+        id = docId
+        return this
+    }
 
     /** Creates a new text field.
      *
@@ -140,7 +149,7 @@ class DocumentBuilder private constructor (
      */
     fun build(): Document {
         return Document(
-            id = generateId(UUID.randomUUID(), language),
+            id = generateId(id, language),
             namespace = namespace,
             fields = fields.toList()
         )

@@ -1,5 +1,6 @@
 package be.rlab.search.model
 
+import be.rlab.nlp.Normalizer
 import be.rlab.nlp.model.Language
 import be.rlab.search.IndexManager
 import org.apache.lucene.document.DoublePoint
@@ -24,7 +25,7 @@ class QueryBuilder private constructor (
             val builder = QueryBuilder(language)
 
             return builder.apply {
-                term(IndexManager.NAMESPACE_FIELD, namespace)
+                term(IndexManager.NAMESPACE_FIELD, namespace, normalize = false)
             }
         }
     }
@@ -52,9 +53,31 @@ class QueryBuilder private constructor (
         return this
     }
 
+    fun phrase(
+        fieldName: String,
+        vararg values: String,
+        normalize: Boolean = true,
+        maxEditDistance: Int = 0,
+        occur: BooleanClause.Occur = BooleanClause.Occur.MUST,
+        callback: QueryModifiers.() -> Unit = {}
+    ): QueryBuilder {
+        val terms: Array<out String> = if (normalize) {
+            values.map(this::normalize).toTypedArray()
+        } else {
+            values
+        }
+
+        root = root.add(withModifiers(
+            PhraseQuery(maxEditDistance, fieldName, *terms),
+            callback
+        ), occur)
+        return this
+    }
+
     fun fuzzy(
         fieldName: String,
         value: String,
+        normalize: Boolean = true,
         maxEdits: Int = FuzzyQuery.defaultMaxEdits,
         prefixLength: Int = FuzzyQuery.defaultPrefixLength,
         maxExpansions: Int = FuzzyQuery.defaultMaxExpansions,
@@ -62,8 +85,14 @@ class QueryBuilder private constructor (
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST,
         callback: QueryModifiers.() -> Unit = {}
     ): QueryBuilder {
+        val term: String = if (normalize) {
+            normalize(value)
+        } else {
+            value
+        }
+
         root = root.add(withModifiers(
-            FuzzyQuery(Term(fieldName, value), maxEdits, prefixLength, maxExpansions, transpositions),
+            FuzzyQuery(Term(fieldName, term), maxEdits, prefixLength, maxExpansions, transpositions),
             callback
         ), occur)
         return this
@@ -86,13 +115,21 @@ class QueryBuilder private constructor (
     fun term(
         fieldName: String,
         value: String,
+        normalize: Boolean = true,
         occur: BooleanClause.Occur = BooleanClause.Occur.MUST,
         callback: QueryModifiers.() -> Unit = {}
     ): QueryBuilder {
+        val term: String = if (normalize) {
+            normalize(value)
+        } else {
+            value
+        }
+
         root = root.add(withModifiers(
-            TermQuery(Term(fieldName, value)),
+            TermQuery(Term(fieldName, term)),
             callback
         ), occur)
+
         return this
     }
 
@@ -312,6 +349,11 @@ class QueryBuilder private constructor (
         return this
     }
 
+    fun custom(callback: (BooleanQuery.Builder) -> BooleanQuery.Builder): QueryBuilder {
+        root = callback(root)
+        return this
+    }
+
     fun build(): Query {
         return root.build()
     }
@@ -328,5 +370,9 @@ class QueryBuilder private constructor (
         } else {
             query
         }
+    }
+
+    private fun normalize(value: String): String {
+        return Normalizer(value, language).normalize()
     }
 }

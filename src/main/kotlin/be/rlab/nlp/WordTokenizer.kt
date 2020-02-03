@@ -8,9 +8,9 @@ import java.io.Reader
 
 /** Splits out a document into words.
  * It removes spaces and punctuation.
- * @param punctuation true to remove punctuation, false otherwise.
  */
 class WordTokenizer(
+    /** true to remove punctuation, false otherwise. */
     private val punctuation: Boolean = true
 ) : Tokenizer {
 

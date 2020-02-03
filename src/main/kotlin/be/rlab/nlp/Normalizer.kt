@@ -48,7 +48,7 @@ data class Normalizer(
     }
 
     /** Word tokenizer to split text into words. */
-    private val wordTokenizer = WordTokenizer()
+    private val wordTokenizer = WordTokenizer(removePunctuation)
     private val stopWordTokenizer =
         StopWordTokenizer.new(language)
     private val stemmer = SnowballStemmer.new(language)
@@ -116,15 +116,16 @@ data class Normalizer(
         if (removeDiacritics) {
             normalizedText = normalizedText.replace(REGEX_UNACCENT, "")
         }
-        if (removePunctuation) {
-            normalizedText = wordTokenizer.tokenize(normalizedText.reader()).map { word ->
-                word.toString()
-            }.joinToString(joinWith)
-        }
+
+        normalizedText = wordTokenizer.tokenize(normalizedText.reader()).map { word ->
+            word.toString()
+        }.joinToString(joinWith)
+
         if (removeStopWords) {
-            normalizedText = stopWordTokenizer.tokenize(normalizedText.reader()).map { word ->
-                word.toString()
-            }.joinToString(joinWith)
+            normalizedText = stopWordTokenizer.tokenize(normalizedText.reader())
+                .joinToString(joinWith) { word ->
+                    word.toString()
+                }
         }
         if (stemming) {
             normalizedText = normalizedText.split(joinWith).joinToString(joinWith) { word ->
