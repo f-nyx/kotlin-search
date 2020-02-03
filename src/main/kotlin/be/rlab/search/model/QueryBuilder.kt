@@ -2,12 +2,15 @@ package be.rlab.search.model
 
 import be.rlab.nlp.Normalizer
 import be.rlab.nlp.model.Language
+import be.rlab.search.AnalyzerFactory
 import be.rlab.search.IndexManager
 import org.apache.lucene.document.DoublePoint
 import org.apache.lucene.document.FloatPoint
 import org.apache.lucene.document.IntPoint
 import org.apache.lucene.document.LongPoint
 import org.apache.lucene.index.Term
+import org.apache.lucene.queryparser.classic.QueryParser
+import org.apache.lucene.queryparser.flexible.core.QueryParserHelper
 import org.apache.lucene.search.*
 import org.apache.lucene.util.automaton.RegExp
 
@@ -351,6 +354,16 @@ class QueryBuilder private constructor (
 
     fun custom(callback: (BooleanQuery.Builder) -> BooleanQuery.Builder): QueryBuilder {
         root = callback(root)
+        return this
+    }
+
+    fun parse(
+        defaultField: String,
+        query: String,
+        occur: BooleanClause.Occur = BooleanClause.Occur.MUST
+    ): QueryBuilder {
+        val parser = QueryParser(defaultField, AnalyzerFactory.newAnalyzer(language))
+        root = root.add(parser.parse(query), occur)
         return this
     }
 
