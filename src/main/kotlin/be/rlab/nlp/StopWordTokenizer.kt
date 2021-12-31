@@ -17,12 +17,6 @@ class StopWordTokenizer(
 ) : Tokenizer {
 
     companion object {
-        private val stopWordFiles: Map<Language, String> = mapOf(
-            Language.ENGLISH to "english.txt",
-            Language.SPANISH to "spanish.txt",
-            Language.PORTUGUESE to "portuguese.txt"
-        )
-
         /** Language to determine the list of stop words to use.
          * @param language Stop words language.
          * @return the new tokenizer.
@@ -40,7 +34,7 @@ class StopWordTokenizer(
          * @return the list of stop words.
          */
         fun stopWords(language: Language): List<String> {
-            val langFile = "nlp/stopwords/${stopWordFiles[language]}"
+            val langFile = "nlp/stopwords/${language.name.lowercase()}.txt"
 
             return Thread.currentThread().contextClassLoader
                 .getResourceAsStream(langFile)?.use { resource ->

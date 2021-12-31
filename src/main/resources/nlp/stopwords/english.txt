@@ -2,6 +2,8 @@
 'tis
 'twas
 've
+10
+39
 a
 a's
 able
@@ -276,6 +278,8 @@ ee
 effect
 eg
 eh
+eight
+eighty
 either
 eleven
 else
@@ -328,6 +332,7 @@ find
 finds
 fire
 first
+five
 fix
 fj
 fk
@@ -344,6 +349,7 @@ forth
 forty
 forward
 found
+four
 fr
 free
 from
@@ -698,6 +704,8 @@ next
 nf
 ng
 ni
+nine
+ninety
 nl
 no
 no-one
@@ -740,6 +748,7 @@ om
 omitted
 on
 once
+one
 one's
 ones
 only
@@ -897,6 +906,8 @@ sensible
 sent
 serious
 seriously
+seven
+seventy
 several
 sg
 sh
@@ -931,6 +942,8 @@ similarly
 since
 sincere
 site
+six
+sixty
 sj
 sk
 sl
@@ -986,6 +999,7 @@ taking
 tc
 td
 tell
+ten
 tends
 test
 text
@@ -1056,6 +1070,7 @@ thoughh
 thought
 thoughts
 thousand
+three
 throug
 through
 throughout
@@ -1097,6 +1112,7 @@ twas
 twelve
 twenty
 twice
+two
 tz
 u
 ua

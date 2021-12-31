@@ -99,7 +99,7 @@ class TextClassifier(
         }.map { (category, documents) ->
             val distance: Float = documents.map { document ->
                 jaroWinkler(document[TEXT_FIELD]!!, normalizedText)
-            }.max() ?: 0.0F
+            }.maxOrNull() ?: 0.0F
 
             ClassificationResult(
                 assignedClass = category,

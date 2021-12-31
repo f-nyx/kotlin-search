@@ -30,60 +30,61 @@ import org.apache.lucene.analysis.id.IndonesianAnalyzer
 import org.apache.lucene.analysis.it.ItalianAnalyzer
 import org.apache.lucene.analysis.lt.LithuanianAnalyzer
 import org.apache.lucene.analysis.lv.LatvianAnalyzer
+import org.apache.lucene.analysis.ne.NepaliAnalyzer
+import org.apache.lucene.analysis.nl.DutchAnalyzer
 import org.apache.lucene.analysis.no.NorwegianAnalyzer
 import org.apache.lucene.analysis.pl.PolishAnalyzer
 import org.apache.lucene.analysis.pt.PortugueseAnalyzer
 import org.apache.lucene.analysis.ro.RomanianAnalyzer
 import org.apache.lucene.analysis.ru.RussianAnalyzer
+import org.apache.lucene.analysis.sr.SerbianAnalyzer
 import org.apache.lucene.analysis.sv.SwedishAnalyzer
 import org.apache.lucene.analysis.th.ThaiAnalyzer
 import org.apache.lucene.analysis.tr.TurkishAnalyzer
-import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 
 object AnalyzerFactory {
-
-    private val analyzerClassMap: Map<Language, KClass<out Analyzer>> = mapOf(
-        Language.ARABIC to EnglishAnalyzer::class,
-        Language.ARMENIAN to ArmenianAnalyzer::class,
-        Language.BASQUE to BasqueAnalyzer::class,
-        Language.BENGALI to BengaliAnalyzer::class,
-        Language.BRAZILIAN to BrazilianAnalyzer::class,
-        Language.BULGARIAN to BulgarianAnalyzer::class,
-        Language.CATALAN to CatalanAnalyzer::class,
-        Language.CHINESE to SmartChineseAnalyzer::class,
-        Language.CZECH to CzechAnalyzer::class,
-        Language.DANISH to DanishAnalyzer::class,
-        Language.ENGLISH to EnglishAnalyzer::class,
-        Language.ESTONIAN to EstonianAnalyzer::class,
-        Language.FINNISH to FinnishAnalyzer::class,
-        Language.FRENCH to FrenchAnalyzer::class,
-        Language.GALICIAN to GalicianAnalyzer::class,
-        Language.GERMAN to GermanAnalyzer::class,
-        Language.GREEK to GreekAnalyzer::class,
-        Language.HINDI to HindiAnalyzer::class,
-        Language.HUNGARIAN to HungarianAnalyzer::class,
-        Language.INDONESIAN to IndonesianAnalyzer::class,
-        Language.IRISH to IrishAnalyzer::class,
-        Language.ITALIAN to ItalianAnalyzer::class,
-        Language.LATVIAN to LatvianAnalyzer::class,
-        Language.LITHUANIAN to LithuanianAnalyzer::class,
-        Language.NORWEGIAN to NorwegianAnalyzer::class,
-        Language.PERSIAN to PersianAnalyzer::class,
-        Language.POLISH to PolishAnalyzer::class,
-        Language.PORTUGUESE to PortugueseAnalyzer::class,
-        Language.ROMANIAN to RomanianAnalyzer::class,
-        Language.RUSSIAN to RussianAnalyzer::class,
-        Language.SORANI to SoraniAnalyzer::class,
-        Language.SPANISH to SpanishAnalyzer::class,
-        Language.SWEDISH to SwedishAnalyzer::class,
-        Language.THAI to ThaiAnalyzer::class,
-        Language.TURKISH to TurkishAnalyzer::class
-    )
-
     fun newAnalyzer(language: Language): Analyzer {
-        val klass = analyzerClassMap[language]
-            ?: throw RuntimeException("language not supported: $language")
+        val klass = when(language) {
+            Language.ARABIC -> EnglishAnalyzer::class
+            Language.ARMENIAN -> ArmenianAnalyzer::class
+            Language.BASQUE -> BasqueAnalyzer::class
+            Language.BENGALI -> BengaliAnalyzer::class
+            Language.BRAZILIAN -> BrazilianAnalyzer::class
+            Language.BULGARIAN -> BulgarianAnalyzer::class
+            Language.CATALAN -> CatalanAnalyzer::class
+            Language.CHINESE -> SmartChineseAnalyzer::class
+            Language.CZECH -> CzechAnalyzer::class
+            Language.DANISH -> DanishAnalyzer::class
+            Language.DUTCH -> DutchAnalyzer::class
+            Language.ENGLISH -> EnglishAnalyzer::class
+            Language.ESTONIAN -> EstonianAnalyzer::class
+            Language.FINNISH -> FinnishAnalyzer::class
+            Language.FRENCH -> FrenchAnalyzer::class
+            Language.GALICIAN -> GalicianAnalyzer::class
+            Language.GERMAN -> GermanAnalyzer::class
+            Language.GREEK -> GreekAnalyzer::class
+            Language.HINDI -> HindiAnalyzer::class
+            Language.HUNGARIAN -> HungarianAnalyzer::class
+            Language.INDONESIAN -> IndonesianAnalyzer::class
+            Language.IRISH -> IrishAnalyzer::class
+            Language.ITALIAN -> ItalianAnalyzer::class
+            Language.LATVIAN -> LatvianAnalyzer::class
+            Language.LITHUANIAN -> LithuanianAnalyzer::class
+            Language.NEPALI -> NepaliAnalyzer::class
+            Language.NORWEGIAN -> NorwegianAnalyzer::class
+            Language.PERSIAN -> PersianAnalyzer::class
+            Language.POLISH -> PolishAnalyzer::class
+            Language.PORTUGUESE -> PortugueseAnalyzer::class
+            Language.ROMANIAN -> RomanianAnalyzer::class
+            Language.RUSSIAN -> RussianAnalyzer::class
+            Language.SERBIAN -> SerbianAnalyzer::class
+            Language.SORANI -> SoraniAnalyzer::class
+            Language.SPANISH -> SpanishAnalyzer::class
+            Language.SWEDISH -> SwedishAnalyzer::class
+            Language.THAI -> ThaiAnalyzer::class
+            Language.TURKISH -> TurkishAnalyzer::class
+        }
 
         val stopWords = StopWordTokenizer.stopWords(language)
 

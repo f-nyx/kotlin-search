@@ -1,8 +1,8 @@
 package be.rlab.search
 
 import be.rlab.nlp.model.Language
-import org.junit.Before
-import org.junit.Test
+import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Test
 import java.io.File
 import java.util.*
 
@@ -20,7 +20,7 @@ class IndexManagerTest {
     private val indexDir: File = File("./data/test-index")
     private lateinit var indexManager: IndexManager
 
-    @Before
+    @BeforeEach
     fun setUp() {
         indexDir.deleteRecursively()
         indexManager = IndexManager(indexDir.absolutePath)

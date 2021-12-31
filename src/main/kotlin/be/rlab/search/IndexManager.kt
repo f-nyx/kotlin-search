@@ -12,6 +12,8 @@ import org.apache.lucene.index.*
 import org.apache.lucene.search.*
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import java.io.File
 import org.apache.lucene.document.Document as LuceneDocument
 
@@ -29,12 +31,15 @@ import org.apache.lucene.document.Document as LuceneDocument
  * This implementation uses a file system based index, so changes requires synchronization before the index is
  * closed. If you don't call [sync] before shutting down the application, all pending changes will be lost.
  *
- * NOTE: [IndexManager] instances are completely thread safe.
- *
- * @param indexPath Path to store indexes.
+ * NOTE: [IndexManager] instances are thread safe.
  */
-class IndexManager(indexPath: String) {
+class IndexManager(
+    /** Path to store indexes. */
+    indexPath: String
+) {
     companion object {
+        private val logger: Logger = LoggerFactory.getLogger(IndexManager::class.java)
+
         const val DEFAULT_LIMIT: Int = 1000
         internal const val ID_FIELD: String = "id"
         internal const val NAMESPACE_FIELD: String = "namespace"
@@ -45,25 +50,21 @@ class IndexManager(indexPath: String) {
     }
 
     /** Indexes per language. */
-    private val indexes: MutableMap<Language, Index> = mutableMapOf()
+    private val indexes: MutableMap<Language, Index> = Language.values().associateWith { language ->
+        val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.lowercase()).toPath())
+        val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
+        val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
+            commit()
+        }
+        val indexReader: IndexReader = DirectoryReader.open(indexDir)
 
-    init {
-        Language.values().map { language ->
-            val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.toLowerCase()).toPath())
-            val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
-            val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
-                commit()
-            }
-            val indexReader: IndexReader = DirectoryReader.open(indexDir)
-
-            language to Index(
-                language = language,
-                analyzer = analyzer,
-                indexReader = indexReader,
-                indexWriter = indexWriter
-            )
-        }.toMap(indexes)
-    }
+        Index(
+            language = language,
+            analyzer = analyzer,
+            indexReader = indexReader,
+            indexWriter = indexWriter
+        )
+    }.toMutableMap()
 
     /** Returns the index for the specified language.
      * @param language Language of the required index.
@@ -241,6 +242,7 @@ class IndexManager(indexPath: String) {
     /** Synchronizes and writes all pending changes to disk.
      */
     fun sync() {
+        logger.debug("writing all indexes to disk")
         Language.values().forEach { language ->
             indexes.getValue(language).indexWriter.commit()
         }
@@ -250,6 +252,7 @@ class IndexManager(indexPath: String) {
      * @param sync true to synchronize changes.
      */
     fun close(sync: Boolean = true) {
+        logger.debug("closing index manager")
         if (sync) {
             sync()
         }
@@ -305,13 +308,16 @@ class IndexManager(indexPath: String) {
     }
 
     private fun searcher(language: Language): IndexSearcher {
+        logger.debug("creating index searcher for language: $language")
         return IndexSearcher(indexReader(language))
     }
 
     private fun indexReader(language: Language): IndexReader {
+        logger.debug("loading index reader for language: $language")
         val indexReader = indexes.getValue(language).indexReader
 
         DirectoryReader.openIfChanged(indexReader as DirectoryReader)?.let { nextReader ->
+            logger.debug("index changed, reloaded from disk")
             indexes[language] = indexes.getValue(language).update(nextReader)
         }
 

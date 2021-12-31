@@ -51,7 +51,7 @@ data class Normalizer(
     private val wordTokenizer = WordTokenizer(removePunctuation)
     private val stopWordTokenizer =
         StopWordTokenizer.new(language)
-    private val stemmer = SnowballStemmer.new(language)
+    private val stemmer = MultiLanguageStemmer.new(language)
 
     fun caseSensitive(): Normalizer = copy(
         caseSensitive = true
@@ -116,6 +116,9 @@ data class Normalizer(
         if (removeDiacritics) {
             normalizedText = normalizedText.replace(REGEX_UNACCENT, "")
         }
+        if (!caseSensitive) {
+            normalizedText = normalizedText.lowercase()
+        }
 
         normalizedText = wordTokenizer.tokenize(normalizedText.reader()).map { word ->
             word.toString()
@@ -131,9 +134,6 @@ data class Normalizer(
             normalizedText = normalizedText.split(joinWith).joinToString(joinWith) { word ->
                 stemmer.stem(word)
             }
-        }
-        if (!caseSensitive) {
-            normalizedText = normalizedText.toLowerCase()
         }
 
         return normalizedText

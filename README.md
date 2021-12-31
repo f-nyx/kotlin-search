@@ -21,9 +21,14 @@ This is available on Maven Central Repository. It can be added using the followi
 <dependency>
     <groupId>be.rlab</groupId>
     <artifactId>kotlin-search</artifactId>
-    <version>1.0.2</version>
+    <version>1.1.0</version>
 </dependency>
 ```
+
+This version supports Kotlin 1.6 and Lucene 9.
+
+The only two hard dependencies are SLF4j and commons-codec. We will not add more dependencies unless it's strictly
+necessary to avoid classpath errors.
 
 ## Multi-language search index
 
