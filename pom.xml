@@ -48,6 +48,7 @@
         <slf4j.all.version>1.7.32</slf4j.all.version>
 
         <kotlin.version>1.6.10</kotlin.version>
+        <dokka.version>1.6.10</dokka.version>
         <kotlin.code.style>official</kotlin.code.style>
     </properties>
 
@@ -161,6 +162,7 @@
 
     <build>
         <finalName>kotlin-search</finalName>
+        <sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
         <plugins>
             <plugin>
                 <groupId>org.jetbrains.kotlin</groupId>
@@ -173,11 +175,6 @@
                         <goals>
                             <goal>compile</goal>
                         </goals>
-                        <configuration>
-                            <sourceDirs>
-                                <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
-                            </sourceDirs>
-                        </configuration>
                     </execution>
                     <execution>
                         <id>test-compile</id>
@@ -185,11 +182,6 @@
                         <goals>
                             <goal>test-compile</goal>
                         </goals>
-                        <configuration>
-                            <sourceDirs>
-                                <sourceDir>${project.basedir}/src/test/kotlin</sourceDir>
-                            </sourceDirs>
-                        </configuration>
                     </execution>
                 </executions>
                 <configuration>
@@ -341,10 +333,14 @@
             </activation>
             <build>
                 <plugins>
+                    <!--
+                    WARNING: dokka requires the sourceDirectory attribute in the build section to work.
+                    If you specify the source directories in the kotlin plugin, dokka will not work.
+                    -->
                     <plugin>
                         <groupId>org.jetbrains.dokka</groupId>
                         <artifactId>dokka-maven-plugin</artifactId>
-                        <version>1.5.0</version>
+                        <version>${dokka.version}</version>
                         <executions>
                             <execution>
                                 <phase>package</phase>
