@@ -332,7 +332,7 @@
     <profiles>
         <!-- GPG Signature on release -->
         <profile>
-            <id>release-sign-artifacts</id>
+            <id>release</id>
             <activation>
                 <property>
                     <name>performRelease</name>
