@@ -113,7 +113,7 @@ Column-wise fields for sorting/faceting are not supported yet.
 
 _kotlin-search_ provides a DSL to build Lucene queries.
 
-```
+```kotlin
 val indexManager = IndexManager("/tmp/lucene-index")
 
 indexManager.search("players", Language.SPANISH) {
@@ -139,7 +139,7 @@ the current ```BooleanQuery``` in construction.
 All queries have additional parameters that are initialized to the default Lucene values. If you need to
 boost a query you can apply the boost as a modifier:
 
-```
+```kotlin
 indexManager.search("players", Language.SPANISH) {
     term("firstName", "Juan") {
         boost(0.5F)
