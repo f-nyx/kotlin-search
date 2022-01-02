@@ -42,8 +42,8 @@ not need to perform a range query to retrieve all documents for a language. This
 for documents in different languages simultaneously.
 
 Before continue reading the following sections, we strongly recommend reading
-[Search and Scoring](https://lucene.apache.org/core/7_1_0/core/org/apache/lucene/search/package-summary.html#package.description)
-and [Classic Scoring Formula](https://lucene.apache.org/core/7_1_0/core/org/apache/lucene/search/similarities/TFIDFSimilarity.html)
+[Search and Scoring](https://lucene.apache.org/core/9_9_0/core/org/apache/lucene/search/package-summary.html#package.description)
+and [Classic Scoring Formula](https://lucene.apache.org/core/9_0_0/core/org/apache/lucene/search/similarities/TFIDFSimilarity.html)
 in Lucene documentation. This library uses the default scoring algorithm to match documents.
 
 ### Documents
