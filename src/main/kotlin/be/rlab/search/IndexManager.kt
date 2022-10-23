@@ -9,7 +9,10 @@ import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.document.*
 import org.apache.lucene.document.Field.Store
 import org.apache.lucene.index.*
-import org.apache.lucene.search.*
+import org.apache.lucene.search.IndexSearcher
+import org.apache.lucene.search.ScoreDoc
+import org.apache.lucene.search.TermQuery
+import org.apache.lucene.search.TopDocs
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import org.slf4j.Logger
@@ -39,10 +42,13 @@ class IndexManager(
 ) {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(IndexManager::class.java)
+        const val CURRENT_VERSION: String = "2"
 
         const val DEFAULT_LIMIT: Int = 1000
+        internal const val PRIVATE_FIELD_PREFIX: String = "private::"
         internal const val ID_FIELD: String = "id"
         internal const val NAMESPACE_FIELD: String = "namespace"
+        internal const val VERSION_FIELD: String = "version"
         private const val FIELD_TYPE: String = "type"
         private val NUMERIC_TYPES: List<FieldType> = listOf(
             FieldType.INT, FieldType.LONG, FieldType.FLOAT, FieldType.DOUBLE
@@ -86,7 +92,7 @@ class IndexManager(
         language: Language,
         builder: DocumentBuilder.() -> Unit
     ) {
-        index(DocumentBuilder.new(namespace, language, builder).build())
+        index(DocumentBuilder.new(namespace, language, "1", builder).build())
     }
 
     /** Analyzes and indexes a document.
@@ -97,41 +103,43 @@ class IndexManager(
         val indexWriter: IndexWriter = indexes.getValue(language).indexWriter
 
         indexWriter.addDocument(LuceneDocument().apply {
-            add(StringField(ID_FIELD, document.id, Store.YES))
-            add(StringField(NAMESPACE_FIELD, document.namespace, Store.YES))
+            add(StringField(privateField(ID_FIELD, document.version), document.id, Store.YES))
+            add(StringField(privateField(NAMESPACE_FIELD, document.version), document.namespace, Store.YES))
 
             document.fields.forEach { field ->
                 val newField = when(field.type) {
-                    FieldType.STRING -> StringField(field.name, field.value as String, if (field.stored) {
-                        Store.YES
-                    } else {
-                        Store.NO
-                    })
+                    FieldType.STRING ->
+                        StringField(field.name, field.value as String, if (field.stored) {
+                            Store.YES
+                        } else {
+                            Store.NO
+                        })
                     FieldType.TEXT -> TextField(field.name, field.value as String, if (field.stored) {
                         Store.YES
                     } else {
                         Store.NO
                     })
-                    FieldType.INT -> IntPoint(field.name, *(field.value as IntArray))
-                    FieldType.LONG -> LongPoint(field.name, *(field.value as LongArray))
-                    FieldType.FLOAT -> FloatPoint(field.name, *(field.value as FloatArray))
-                    FieldType.DOUBLE -> DoublePoint(field.name, *(field.value as DoubleArray))
+                    FieldType.INT -> IntPoint(field.name, *toArray(field.value) as IntArray)
+                    FieldType.LONG -> LongPoint(field.name, *toArray(field.value) as LongArray)
+                    FieldType.FLOAT -> FloatPoint(field.name, *toArray(field.value) as FloatArray)
+                    FieldType.DOUBLE -> DoublePoint(field.name, *toArray(field.value) as DoubleArray)
                 }
 
                 if (field.stored && NUMERIC_TYPES.contains(field.type)) {
                     newField.numericValue()?.let { value ->
                         add(when (newField) {
-                            is IntPoint -> StoredField(field.name, value.toInt())
-                            is LongPoint -> StoredField(field.name, value.toLong())
-                            is FloatPoint -> StoredField(field.name, value.toFloat())
-                            is DoublePoint -> StoredField(field.name, value.toDouble())
+                            is IntPoint -> StoredField(newField.name(), value.toInt())
+                            is LongPoint -> StoredField(newField.name(), value.toLong())
+                            is FloatPoint -> StoredField(newField.name(), value.toFloat())
+                            is DoublePoint -> StoredField(newField.name(), value.toDouble())
                             else -> throw RuntimeException("unknown numeric field type: ${field.type}")
                         })
                     }
                 }
 
                 add(newField)
-                add(StringField("${field.name}!!$FIELD_TYPE", field.type.name, Store.YES))
+                add(StringField(privateField("${field.name}!!$FIELD_TYPE", document.version), field.type.name, Store.YES))
+                add(StringField(privateField(VERSION_FIELD), document.version, Store.YES))
             }
         })
     }
@@ -142,7 +150,7 @@ class IndexManager(
      */
     fun get(documentId: String): Document? {
         return with(searcher(getLanguage(documentId))) {
-            val topDocs = search(TermQuery(Term(ID_FIELD, documentId)), 1)
+            val topDocs = search(TermQuery(Term(privateField(ID_FIELD), documentId)), 1)
             transform(this, topDocs).docs.firstOrNull()
         }
     }
@@ -171,7 +179,7 @@ class IndexManager(
      *
      * The query builder provides a flexible interface to build Lucene queries.
      *
-     * The cursor and the limit allows to paginate the search results. If you provide a cursor returned
+     * The cursor and the limit allow to paginate the search results. If you provide a cursor returned
      * in a previous [SearchResult], this method resumes the search from there.
      *
      * @param namespace Documents namespace.
@@ -187,10 +195,24 @@ class IndexManager(
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
     ): SearchResult {
-        val query = QueryBuilder.query(namespace, language).apply {
-            builder(this)
-        }
+        val query = QueryBuilder.query(namespace, language).apply(builder)
+        return search(query, cursor, limit)
+    }
 
+    /** Search for documents.
+     *
+     * The cursor and the limit allow to paginate the search results. If you provide a cursor returned
+     * in a previous [SearchResult], this method resumes the search from there.
+     *
+     * @param query Query builder ready for search.
+     * @param cursor Cursor to resume a paginated search.
+     * @param limit Max number of results to retrieve.
+     */
+    fun search(
+        query: QueryBuilder,
+        cursor: Cursor = Cursor.first(),
+        limit: Int = DEFAULT_LIMIT
+    ): SearchResult {
         return with(searcher(query.language)) {
             if (cursor.isFirst()) {
                 transform(this, search(query.build(), limit))
@@ -269,15 +291,23 @@ class IndexManager(
 
         val resolvedDocs: List<Document> = topDocs.scoreDocs.map { scoreDoc ->
             val luceneDoc = searcher.doc(scoreDoc.doc)
-            val id: String = luceneDoc.getField(ID_FIELD).stringValue()
+            val version: String = luceneDoc.getField(privateField(VERSION_FIELD)).stringValue() ?: "1"
+            val id: String = luceneDoc.getField(privateField(ID_FIELD, version)).stringValue()
 
-            Document(
+            Document.new(
                 id = id,
-                namespace = luceneDoc.getField(NAMESPACE_FIELD).stringValue(),
+                namespace = luceneDoc.getField(privateField(NAMESPACE_FIELD, version)).stringValue(),
+                version = version,
                 fields = luceneDoc.fields.filter { field ->
-                    field.name() != ID_FIELD &&
-                    field.name() != NAMESPACE_FIELD &&
-                    !field.name().contains("!!")
+                    when(version) {
+                        "1" ->
+                            field.name() != ID_FIELD &&
+                            field.name() != NAMESPACE_FIELD &&
+                            field.name() != privateField(VERSION_FIELD) &&
+                            !field.name().contains("!!")
+                        "2" -> !field.name().startsWith(PRIVATE_FIELD_PREFIX)
+                        else -> throw RuntimeException("invalid document version: $version")
+                    }
                 }.map { field: IndexableField ->
                     Field(
                         name = field.name(),
@@ -285,7 +315,9 @@ class IndexManager(
                             ?: field.stringValue()
                             ?: field.binaryValue()
                             ?: field.readerValue(),
-                        type = FieldType.valueOf(luceneDoc.getField("${field.name()}!!$FIELD_TYPE").stringValue())
+                        type = FieldType.valueOf(
+                            luceneDoc.getField(privateField("${field.name()}!!$FIELD_TYPE", version)).stringValue()
+                        )
                     )
                 }
             )
@@ -322,5 +354,27 @@ class IndexManager(
         }
 
         return indexes.getValue(language).indexReader
+    }
+
+    private fun toArray(source: Any): Any {
+        return when (source) {
+            is IntArray, is LongArray, is FloatArray, is DoubleArray -> source
+            is Int -> intArrayOf(source)
+            is Long -> longArrayOf(source)
+            is Float -> floatArrayOf(source)
+            is Double -> doubleArrayOf(source)
+            else -> throw RuntimeException("Unsupported numeric value: $source")
+        }
+    }
+
+    private fun privateField(
+        name: String,
+        version: String = CURRENT_VERSION
+    ): String {
+        return when(version) {
+            "1" -> name
+            "2" -> "$PRIVATE_FIELD_PREFIX$name"
+            else -> throw RuntimeException("invalid document version: $version")
+        }
     }
 }

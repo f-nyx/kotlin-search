@@ -8,15 +8,17 @@ import java.util.*
  */
 class DocumentBuilder private constructor (
     private val namespace: String,
-    private val language: Language
+    private val language: Language,
+    private val version: String
 ){
     companion object {
         fun new(
             namespace: String,
             language: Language,
+            version: String,
             callback: DocumentBuilder.() -> Unit
         ): DocumentBuilder {
-            val builder = DocumentBuilder(namespace, language)
+            val builder = DocumentBuilder(namespace, language, version)
             callback(builder)
             return builder
         }
@@ -148,10 +150,11 @@ class DocumentBuilder private constructor (
     /** Builds the document.
      */
     fun build(): Document {
-        return Document(
+        return Document.new(
             id = generateId(id, language),
             namespace = namespace,
-            fields = fields.toList()
+            fields = fields.toList(),
+            version = version
         )
     }
 

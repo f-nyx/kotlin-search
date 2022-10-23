@@ -1,6 +1,7 @@
 package be.rlab.training
 
 import be.rlab.search.IndexManager
+import be.rlab.search.query.term
 import be.rlab.support.csv.Field
 import be.rlab.support.csv.Parser
 import org.slf4j.Logger

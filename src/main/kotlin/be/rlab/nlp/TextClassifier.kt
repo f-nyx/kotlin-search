@@ -7,6 +7,7 @@ import be.rlab.nlp.model.TrainingDataSet
 import be.rlab.search.IndexManager
 import be.rlab.search.model.Index
 import be.rlab.search.model.SearchResult
+import be.rlab.search.query.wildcard
 
 /** This class allows to train and query text classifiers.
  *

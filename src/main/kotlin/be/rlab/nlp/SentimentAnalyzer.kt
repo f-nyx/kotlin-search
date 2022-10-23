@@ -4,6 +4,7 @@ import be.rlab.nlp.model.Language
 import be.rlab.nlp.model.Sentiment
 import be.rlab.nlp.model.SentimentResult
 import be.rlab.search.IndexManager
+import be.rlab.search.query.term
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min

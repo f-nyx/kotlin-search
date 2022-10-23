@@ -12,18 +12,36 @@ data class Document(
     /** Document namespace that represents this collection. */
     val namespace: String,
     /** List of fields */
-    val fields: List<Field>
+    val fields: List<Field>,
+
+    /** Document version, used to keep backward compatibility between releases. */
+    val version: String
 ) {
     companion object {
         fun new(
+            id: String,
+            namespace: String,
+            fields: List<Field>,
+            version: String
+        ): Document =
+            Document(
+                id = id,
+                namespace = namespace,
+                fields = fields,
+                version = version
+            )
+
+        fun new(
             namespace: String,
             language: Language,
-            vararg fields: Field
+            fields: List<Field>,
+            version: String
         ): Document =
             Document(
                 id = generateId(UUID.randomUUID(), language),
                 namespace = namespace,
-                fields = fields.toList()
+                fields = fields,
+                version = version
             )
     }
 
