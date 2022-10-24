@@ -11,7 +11,7 @@ class IndexMapper(
      */
     @Suppress("UNCHECKED_CAST")
     fun<T : Any> index(source: T) {
-        val reader = DocumentMetadata.read(source::class) as DocumentMetadata<T>
+        val reader = DocumentSchema.fromClass(source::class) as DocumentSchema<T>
         reader.buildDocuments(source).forEach { doc ->
             indexManager.index(doc)
         }
@@ -36,8 +36,8 @@ class IndexMapper(
         limit: Int = IndexManager.DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
     ): TypedSearchResult<T> {
-        val metadata: DocumentMetadata<T> = DocumentMetadata.read(T::class)
-        val query = QueryBuilder.query(metadata, language).apply(builder)
+        val schema: DocumentSchema<T> = DocumentSchema.fromClass(T::class)
+        val query = QueryBuilder.forSchema(schema, language).apply(builder)
         val result = indexManager.search(query, cursor, limit)
 
         return TypedSearchResult(

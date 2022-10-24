@@ -2,9 +2,7 @@ package be.rlab.search
 
 import be.rlab.nlp.model.Language
 import be.rlab.search.model.TypedSearchResult
-import be.rlab.search.query.range
 import be.rlab.search.query.term
-import be.rlab.search.query.wildcard
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -38,6 +36,15 @@ class IndexManagerTest {
 
     @Test
     fun terms() {
+        indexManager.addSchema(NAMESPACE) {
+            string(FIELD_ID)
+            int(FIELD_HASH)
+            text(FIELD_TITLE)
+            text(FIELD_DESCRIPTION)
+            text(FIELD_AUTHOR_NAME)
+            text(FIELD_CATEGORY)
+        }
+
         indexManager.index(NAMESPACE, Language.SPANISH) {
             string(FIELD_ID, UUID.randomUUID().toString())
             int(FIELD_HASH, 1234)
@@ -56,11 +63,24 @@ class IndexManagerTest {
         }
         indexManager.sync()
 
-        val results = indexManager.find(NAMESPACE, Language.SPANISH) {
+        val results1 = indexManager.search(NAMESPACE, Language.SPANISH) {
+            term("Memorias")
+        }
+        val results2 = indexManager.search(NAMESPACE, Language.SPANISH) {
             term(FIELD_TITLE, "Memorias")
-        }.toList()
+            term("drama") {
+                by(FIELD_DESCRIPTION, FIELD_CATEGORY)
+            }
+        }
+        val results3 = indexManager.search(NAMESPACE, Language.SPANISH) {
+            term("drama") {
+                by(FIELD_DESCRIPTION)
+            }
+        }
 
-        assert(results.size == 1)
+        assert(results1.docs.size == 1)
+        assert(results2.docs.size == 1)
+        assert(results3.docs.isEmpty())
     }
 
     @Test

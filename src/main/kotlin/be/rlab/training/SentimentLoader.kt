@@ -9,7 +9,7 @@ import be.rlab.nlp.SentimentAnalyzer.Companion.VALUE_FIELD
 import be.rlab.nlp.model.Language.ENGLISH
 import be.rlab.nlp.model.Language.SPANISH
 import be.rlab.search.IndexManager
-import be.rlab.search.model.DocumentBuilder
+import be.rlab.search.DocumentBuilder
 import be.rlab.support.csv.Field
 import be.rlab.support.csv.ParserConfig
 import java.io.File

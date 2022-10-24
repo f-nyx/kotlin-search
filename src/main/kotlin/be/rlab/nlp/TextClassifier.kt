@@ -5,7 +5,7 @@ import be.rlab.nlp.model.ClassificationResult
 import be.rlab.nlp.model.Language
 import be.rlab.nlp.model.TrainingDataSet
 import be.rlab.search.IndexManager
-import be.rlab.search.model.Index
+import be.rlab.search.LuceneIndex
 import be.rlab.search.model.SearchResult
 import be.rlab.search.query.wildcard
 
@@ -14,7 +14,7 @@ import be.rlab.search.query.wildcard
  * This implementation is not designed for performance. The classification retrieves all features from the index
  * for a specific namespace and it evaluates distances on runtime. The features are normalized before storing them.
  *
- * It uses an [Index] to store the training data set.
+ * It uses an [LuceneIndex] to store the training data set.
  */
 class TextClassifier(
     private val indexManager: IndexManager,

@@ -1,6 +1,7 @@
 package be.rlab.search
 
 import be.rlab.nlp.model.Language
+import be.rlab.search.annotation.*
 import be.rlab.search.model.FieldType
 
 @IndexDocument(namespace = IndexManagerTest.NAMESPACE, languages = [Language.SPANISH, Language.ENGLISH])

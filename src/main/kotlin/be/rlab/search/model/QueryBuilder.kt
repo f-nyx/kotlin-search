@@ -2,17 +2,20 @@ package be.rlab.search.model
 
 import be.rlab.nlp.Normalizer
 import be.rlab.nlp.model.Language
-import be.rlab.search.IndexManager.Companion.NAMESPACE_FIELD
-import be.rlab.search.IndexManager.Companion.PRIVATE_FIELD_PREFIX
+import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
+import be.rlab.search.LuceneIndex.Companion.PRIVATE_FIELD_PREFIX
 import be.rlab.search.query.term
-import org.apache.lucene.search.*
+import org.apache.lucene.search.BooleanClause
+import org.apache.lucene.search.BooleanQuery
+import org.apache.lucene.search.BoostQuery
+import org.apache.lucene.search.Query
 import kotlin.reflect.KProperty1
 
 /** Builder to create Lucene [Query]s.
  */
 class QueryBuilder private constructor (
     val language: Language,
-    val fields: List<FieldMetadata>
+    val fields: List<FieldSchema>
 ) {
 
     companion object {
@@ -27,23 +30,35 @@ class QueryBuilder private constructor (
             }
         }
 
-        fun query(
-            metadata: DocumentMetadata<*>,
+        fun forSchema(
+            schema: DocumentSchema<*>,
             language: Language
+        ): QueryBuilder =
+            forSchema(schema, language, "$PRIVATE_FIELD_PREFIX$NAMESPACE_FIELD")
+
+        internal fun forSchema(
+            schema: DocumentSchema<*>,
+            language: Language,
+            namespaceField: String
         ): QueryBuilder {
-            val builder = QueryBuilder(language, fields = metadata.fields)
+            val builder = QueryBuilder(language, fields = schema.fields)
 
             return builder.apply {
-                term("$PRIVATE_FIELD_PREFIX$NAMESPACE_FIELD", metadata.namespace, normalize = false)
+                term(namespaceField, schema.namespace, normalize = false)
             }
         }
     }
 
     class QueryModifiers(
-        internal var boost: Float = -1.0F
+        internal var boost: Float = -1.0F,
+        internal val searchBy: MutableList<String> = mutableListOf()
     ) {
         fun boost(score: Float) {
             boost = score
+        }
+
+        fun by(vararg fields: String) {
+            searchBy.addAll(fields.toList())
         }
     }
 
@@ -68,7 +83,7 @@ class QueryBuilder private constructor (
         property: KProperty1<T, *>,
         occur: BooleanClause.Occur,
         callback: QueryModifiers.() -> Unit,
-        builder: (FieldMetadata) -> Query
+        builder: (FieldSchema) -> Query
     ): QueryBuilder = apply {
         require(fields.isNotEmpty()) { "QueryBuilder does not support search by multiple fields" }
 
@@ -84,12 +99,18 @@ class QueryBuilder private constructor (
     fun findByAllFields(
         occur: BooleanClause.Occur,
         callback: QueryModifiers.() -> Unit,
-        builder: (FieldMetadata) -> Query
+        builder: (FieldSchema) -> Query
     ): QueryBuilder = apply {
         require(fields.isNotEmpty()) { "QueryBuilder does not support search by multiple fields" }
-        val queries = fields.map(builder)
+        val modifiers = QueryModifiers().apply(callback)
+        val selectedFields = if (modifiers.searchBy.isNotEmpty()) {
+            fields.filter { field -> modifiers.searchBy.contains(field.name) }
+        } else {
+            fields
+        }
+        val queries = selectedFields.map(builder)
         val child: BooleanQuery.Builder = queries.fold(BooleanQuery.Builder()) { aggregate, query ->
-            aggregate.add(withModifiers(query, callback), BooleanClause.Occur.SHOULD)
+            aggregate.add(withModifiers(query, modifiers), BooleanClause.Occur.SHOULD)
         }
         root.add(child.build(), occur)
     }
@@ -109,10 +130,13 @@ class QueryBuilder private constructor (
     private fun withModifiers(
         query: Query,
         callback: QueryModifiers.() -> Unit
-    ): Query {
-        val modifiers = QueryModifiers()
-        callback(modifiers)
+    ): Query =
+        withModifiers(query, QueryModifiers().apply(callback))
 
+    private fun withModifiers(
+        query: Query,
+        modifiers: QueryModifiers
+    ): Query {
         return if (modifiers.boost >= 0) {
             BoostQuery(query, modifiers.boost)
         } else {

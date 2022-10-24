@@ -1,4 +1,4 @@
-package be.rlab.search
+package be.rlab.search.annotation
 
 import be.rlab.search.model.FieldType
 

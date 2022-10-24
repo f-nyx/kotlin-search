@@ -2,12 +2,11 @@ package be.rlab.search
 
 import be.rlab.nlp.model.Language
 import be.rlab.search.Hashes.getLanguage
+import be.rlab.search.LuceneIndex.Companion.ID_FIELD
+import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
+import be.rlab.search.LuceneIndex.Companion.privateField
 import be.rlab.search.model.*
-import be.rlab.search.model.Field
-import be.rlab.search.model.FieldType
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.document.*
-import org.apache.lucene.document.Field.Store
 import org.apache.lucene.index.*
 import org.apache.lucene.search.IndexSearcher
 import org.apache.lucene.search.ScoreDoc
@@ -18,7 +17,6 @@ import org.apache.lucene.store.FSDirectory
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
-import org.apache.lucene.document.Document as LuceneDocument
 
 /** Multi-language full-text search index.
  *
@@ -42,21 +40,11 @@ class IndexManager(
 ) {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(IndexManager::class.java)
-        const val CURRENT_VERSION: String = "2"
-
         const val DEFAULT_LIMIT: Int = 1000
-        internal const val PRIVATE_FIELD_PREFIX: String = "private::"
-        internal const val ID_FIELD: String = "id"
-        internal const val NAMESPACE_FIELD: String = "namespace"
-        internal const val VERSION_FIELD: String = "version"
-        private const val FIELD_TYPE: String = "type"
-        private val NUMERIC_TYPES: List<FieldType> = listOf(
-            FieldType.INT, FieldType.LONG, FieldType.FLOAT, FieldType.DOUBLE
-        )
     }
 
     /** Indexes per language. */
-    private val indexes: MutableMap<Language, Index> = Language.values().associateWith { language ->
+    private val indexes: MutableMap<Language, LuceneIndex> = Language.values().associateWith { language ->
         val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.lowercase()).toPath())
         val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
         val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
@@ -64,7 +52,7 @@ class IndexManager(
         }
         val indexReader: IndexReader = DirectoryReader.open(indexDir)
 
-        Index(
+        LuceneIndex(
             language = language,
             analyzer = analyzer,
             indexReader = indexReader,
@@ -72,11 +60,14 @@ class IndexManager(
         )
     }.toMutableMap()
 
+    /** Registered document schemas. */
+    private val schemas: MutableMap<String, DocumentSchema<*>> = mutableMapOf()
+
     /** Returns the index for the specified language.
      * @param language Language of the required index.
      * @return The required index.
      */
-    fun index(language: Language): Index {
+    fun index(language: Language): LuceneIndex {
         indexReader(language)
         return indexes.getValue(language)
     }
@@ -100,48 +91,8 @@ class IndexManager(
      */
     fun index(document: Document) {
         val language: Language = getLanguage(document.id)
-        val indexWriter: IndexWriter = indexes.getValue(language).indexWriter
-
-        indexWriter.addDocument(LuceneDocument().apply {
-            add(StringField(privateField(ID_FIELD, document.version), document.id, Store.YES))
-            add(StringField(privateField(NAMESPACE_FIELD, document.version), document.namespace, Store.YES))
-
-            document.fields.forEach { field ->
-                val newField = when(field.type) {
-                    FieldType.STRING ->
-                        StringField(field.name, field.value as String, if (field.stored) {
-                            Store.YES
-                        } else {
-                            Store.NO
-                        })
-                    FieldType.TEXT -> TextField(field.name, field.value as String, if (field.stored) {
-                        Store.YES
-                    } else {
-                        Store.NO
-                    })
-                    FieldType.INT -> IntPoint(field.name, *toArray(field.value) as IntArray)
-                    FieldType.LONG -> LongPoint(field.name, *toArray(field.value) as LongArray)
-                    FieldType.FLOAT -> FloatPoint(field.name, *toArray(field.value) as FloatArray)
-                    FieldType.DOUBLE -> DoublePoint(field.name, *toArray(field.value) as DoubleArray)
-                }
-
-                if (field.stored && NUMERIC_TYPES.contains(field.type)) {
-                    newField.numericValue()?.let { value ->
-                        add(when (newField) {
-                            is IntPoint -> StoredField(newField.name(), value.toInt())
-                            is LongPoint -> StoredField(newField.name(), value.toLong())
-                            is FloatPoint -> StoredField(newField.name(), value.toFloat())
-                            is DoublePoint -> StoredField(newField.name(), value.toDouble())
-                            else -> throw RuntimeException("unknown numeric field type: ${field.type}")
-                        })
-                    }
-                }
-
-                add(newField)
-                add(StringField(privateField("${field.name}!!$FIELD_TYPE", document.version), field.type.name, Store.YES))
-                add(StringField(privateField(VERSION_FIELD), document.version, Store.YES))
-            }
-        })
+        val index: LuceneIndex = indexes.getValue(language)
+        index.addDocument(document)
     }
 
     /** Retrieves a document by id.
@@ -149,9 +100,10 @@ class IndexManager(
      * @return the required document, or null if it does not exist.
      */
     fun get(documentId: String): Document? {
-        return with(searcher(getLanguage(documentId))) {
+        val language = getLanguage(documentId)
+        return with(searcher(language)) {
             val topDocs = search(TermQuery(Term(privateField(ID_FIELD), documentId)), 1)
-            transform(this, topDocs).docs.firstOrNull()
+            transform(index(language), this, topDocs).docs.firstOrNull()
         }
     }
 
@@ -166,9 +118,10 @@ class IndexManager(
         language: Language,
         builder: QueryBuilder.() -> Unit
     ): Int {
-        val query = QueryBuilder.query(namespace, language).apply {
-            builder(this)
-        }
+        val schema = schemas[namespace]
+        val query = schema?.let {
+            QueryBuilder.forSchema(schema, language, NAMESPACE_FIELD).apply(builder)
+        } ?: QueryBuilder.query(namespace, language).apply(builder)
 
         return with(searcher(query.language)) {
             count(query.build())
@@ -195,7 +148,10 @@ class IndexManager(
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
     ): SearchResult {
-        val query = QueryBuilder.query(namespace, language).apply(builder)
+        val schema = schemas[namespace]
+        val query = schema?.let {
+            QueryBuilder.forSchema(schema, language, NAMESPACE_FIELD).apply(builder)
+        } ?: QueryBuilder.query(namespace, language).apply(builder)
         return search(query, cursor, limit)
     }
 
@@ -215,14 +171,14 @@ class IndexManager(
     ): SearchResult {
         return with(searcher(query.language)) {
             if (cursor.isFirst()) {
-                transform(this, search(query.build(), limit))
+                transform(index(query.language), this, search(query.build(), limit))
             } else {
                 val scoreDoc = ScoreDoc(
                     cursor.docId,
                     cursor.score,
                     cursor.shardIndex
                 )
-                transform(this, searchAfter(scoreDoc, query.build(), limit))
+                transform(index(query.language), this, searchAfter(scoreDoc, query.build(), limit))
             }
         }
     }
@@ -284,43 +240,22 @@ class IndexManager(
         }
     }
 
+    fun addSchema(
+        namespace: String,
+        builder: SchemaBuilder.() -> Unit
+    ): IndexManager = apply {
+        schemas[namespace] = SchemaBuilder.new(namespace, builder).build()
+    }
+
     private fun transform(
+        index: LuceneIndex,
         searcher: IndexSearcher,
         topDocs: TopDocs
     ): SearchResult {
 
         val resolvedDocs: List<Document> = topDocs.scoreDocs.map { scoreDoc ->
             val luceneDoc = searcher.doc(scoreDoc.doc)
-            val version: String = luceneDoc.getField(privateField(VERSION_FIELD)).stringValue() ?: "1"
-            val id: String = luceneDoc.getField(privateField(ID_FIELD, version)).stringValue()
-
-            Document.new(
-                id = id,
-                namespace = luceneDoc.getField(privateField(NAMESPACE_FIELD, version)).stringValue(),
-                version = version,
-                fields = luceneDoc.fields.filter { field ->
-                    when(version) {
-                        "1" ->
-                            field.name() != ID_FIELD &&
-                            field.name() != NAMESPACE_FIELD &&
-                            field.name() != privateField(VERSION_FIELD) &&
-                            !field.name().contains("!!")
-                        "2" -> !field.name().startsWith(PRIVATE_FIELD_PREFIX)
-                        else -> throw RuntimeException("invalid document version: $version")
-                    }
-                }.map { field: IndexableField ->
-                    Field(
-                        name = field.name(),
-                        value = field.numericValue()
-                            ?: field.stringValue()
-                            ?: field.binaryValue()
-                            ?: field.readerValue(),
-                        type = FieldType.valueOf(
-                            luceneDoc.getField(privateField("${field.name()}!!$FIELD_TYPE", version)).stringValue()
-                        )
-                    )
-                }
-            )
+            index.map(luceneDoc)
         }
 
         return SearchResult.new(
@@ -354,27 +289,5 @@ class IndexManager(
         }
 
         return indexes.getValue(language).indexReader
-    }
-
-    private fun toArray(source: Any): Any {
-        return when (source) {
-            is IntArray, is LongArray, is FloatArray, is DoubleArray -> source
-            is Int -> intArrayOf(source)
-            is Long -> longArrayOf(source)
-            is Float -> floatArrayOf(source)
-            is Double -> doubleArrayOf(source)
-            else -> throw RuntimeException("Unsupported numeric value: $source")
-        }
-    }
-
-    private fun privateField(
-        name: String,
-        version: String = CURRENT_VERSION
-    ): String {
-        return when(version) {
-            "1" -> name
-            "2" -> "$PRIVATE_FIELD_PREFIX$name"
-            else -> throw RuntimeException("invalid document version: $version")
-        }
     }
 }

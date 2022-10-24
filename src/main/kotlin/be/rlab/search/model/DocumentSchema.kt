@@ -1,27 +1,37 @@
 package be.rlab.search.model
 
 import be.rlab.nlp.model.Language
-import be.rlab.search.IndexDocument
-import be.rlab.search.IndexField
-import be.rlab.search.IndexManager
+import be.rlab.search.LuceneIndex.Companion.CURRENT_VERSION
+import be.rlab.search.annotation.IndexDocument
+import be.rlab.search.annotation.IndexField
 import kotlin.reflect.KClass
 import kotlin.reflect.KProperty1
 import kotlin.reflect.full.declaredMemberProperties
 import kotlin.reflect.full.findAnnotation
 import kotlin.reflect.full.hasAnnotation
 
-data class DocumentMetadata<T : Any>(
+data class DocumentSchema<T : Any>(
     val namespace: String,
     val languages: List<Language>,
-    val fields: List<FieldMetadata>
+    val fields: List<FieldSchema>
 ) {
     companion object {
 
-        fun<T : Any> read(documentType: KClass<T>): DocumentMetadata<T> {
+        fun<T : Any> new(
+            namespace: String,
+            languages: List<Language>,
+            fields: List<FieldSchema>
+        ): DocumentSchema<T> = DocumentSchema(
+            namespace = namespace,
+            languages = languages,
+            fields = fields
+        )
+
+        fun<T : Any> fromClass(documentType: KClass<T>): DocumentSchema<T> {
             val docInfo = extractDocInfo(documentType)
             val fields = extractFields(documentType)
 
-            return DocumentMetadata(
+            return DocumentSchema(
                 namespace = docInfo.namespace,
                 languages = docInfo.languages.toList(),
                 fields = fields
@@ -37,7 +47,7 @@ data class DocumentMetadata<T : Any>(
         }
 
         @Suppress("UNCHECKED_CAST")
-        private fun<T : Any> extractFields(documentType: KClass<T>): List<FieldMetadata> {
+        private fun<T : Any> extractFields(documentType: KClass<T>): List<FieldSchema> {
             require(documentType.hasAnnotation<IndexDocument>()) {
                 "@IndexDocument not found in class: ${documentType.qualifiedName}."
             }
@@ -47,7 +57,7 @@ data class DocumentMetadata<T : Any>(
                     member is KProperty1<*, *> && member.hasAnnotation<IndexField>()
                 }
                 .map { member ->
-                    FieldMetadata.from(member as KProperty1<Any, *>)
+                    FieldSchema.from(member as KProperty1<Any, *>)
                 }
         }
     }
@@ -76,7 +86,7 @@ data class DocumentMetadata<T : Any>(
                 namespace = namespace,
                 language = language,
                 fields = documentFields,
-                version = IndexManager.CURRENT_VERSION
+                version = CURRENT_VERSION
             )
         }
     }

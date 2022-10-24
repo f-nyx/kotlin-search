@@ -1,7 +1,10 @@
-package be.rlab.search.model
+package be.rlab.search
 
 import be.rlab.nlp.model.Language
 import be.rlab.search.Hashes.generateId
+import be.rlab.search.model.Document
+import be.rlab.search.model.Field
+import be.rlab.search.model.FieldType
 import java.util.*
 
 /** Builder to create [Document]s.
