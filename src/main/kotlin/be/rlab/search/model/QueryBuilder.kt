@@ -2,8 +2,8 @@ package be.rlab.search.model
 
 import be.rlab.nlp.Normalizer
 import be.rlab.nlp.model.Language
+import be.rlab.search.LuceneFieldUtils.privateField
 import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
-import be.rlab.search.LuceneIndex.Companion.PRIVATE_FIELD_PREFIX
 import be.rlab.search.query.term
 import org.apache.lucene.search.BooleanClause
 import org.apache.lucene.search.BooleanQuery
@@ -26,18 +26,18 @@ class QueryBuilder private constructor (
             val builder = QueryBuilder(language, fields = emptyList())
 
             return builder.apply {
-                term(NAMESPACE_FIELD, namespace, normalize = false)
+                term(privateField(NAMESPACE_FIELD), namespace, normalize = false)
             }
         }
 
         fun forSchema(
-            schema: DocumentSchema<*>,
+            schema: DocumentSchema,
             language: Language
         ): QueryBuilder =
-            forSchema(schema, language, "$PRIVATE_FIELD_PREFIX$NAMESPACE_FIELD")
+            forSchema(schema, language, privateField(NAMESPACE_FIELD))
 
         internal fun forSchema(
-            schema: DocumentSchema<*>,
+            schema: DocumentSchema,
             language: Language,
             namespaceField: String
         ): QueryBuilder {

@@ -48,7 +48,10 @@ in Lucene documentation. This library uses the default scoring algorithm to matc
 ### Documents
 
 The [Document](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/model/Document.kt)
-is the root entity that represents an entry in the index.
+is the root entity that represents an entry in the index. Each document in the Lucene index is a plain list of
+`key -> value` fields. Lucene supports multi-value fields, which means the same key might be stored multiple times with
+different values in a document. In order to support both single-value and multi-value fields, we use a
+`List<Any>` type to store the values in a [Field](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/model/Field.kt).
 
 Documents have a 160-bits unique identifier composed by the following fields:
 
@@ -62,8 +65,84 @@ by creation date. If you need to retrieve the document's language, you can use t
 [be.rlab.search.Hashes.getLanguage(id)](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/Hashes.kt)
 utility method to retrieve the language from the document's identifier.
 
-The document namespace emulates _domain collections_. All queries will be scoped to a namespace, which means
+The document `namespace` emulates _domain collections_. All queries will be scoped to a `namespace`, which means
 that querying the index is analog to query a collection in a no-sql database.
+
+### Documents schemas
+
+Lucene fields have some attributes that are used in index-time to determine how the field is processed by the index.
+The `stored` attribute tells Lucene to store the field value in the index. The `indexed` attribute indicates that a
+field will be used for search, so it needs to be processed for that purpose. The `docValues` attribute makes a field
+to be saved in a dedicated document-level space, which makes sorting and faceting much faster.
+
+Each Lucene data type provides a default value for all these attributes (look at the data types section below). If you
+want to change the behavior of a field, you should change it for each field and each document. In order to make it
+easier, _kotlin-search_ introduces the concept of `document schemas`. A document schema allows to pre-define a set of
+fields and its preferred attributes for a document. It provides data type validation out of the box, and it can be
+configured at index level.
+
+The following example adds a document schema for the namespace `players` using the Functional DSL. For the Object
+Mapper, the document schema is automatically created based on the annotations (look at the
+[Indexing Documents](#indexing-documents) section below).
+
+```kotlin
+import be.rlab.search.query.*
+
+val indexManager = IndexManager("/tmp/lucene-index").apply {
+    addSchema("players") {
+        string("id")
+        text("firstName")
+        text("lasName")
+        int("age") {
+            store()
+            index()
+            docValues()
+        }
+        float("score") {
+            index()
+            docValues()
+        }
+    }
+}
+```
+
+### Data types
+
+Lucene supports only a few native data types. The following table shows the default attributes for each data type.
+
+| Field type | Stored | Indexed | Description
+|------------|--------|---------|-------------
+| string     |   yes  | no      | A String value stored exactly as it is provided.
+| text       |   yes  | yes     | A String value that is tokenized and pre-processed by language analyzers.
+| int        |   no   | no      | A multi-dimensional Int value for fast range filters.
+| long       |   no   | no      | A multi-dimensional Long value for fast range filters.
+| float      |   no   | no      | A multi-dimensional Float value for fast range filters.
+| double     |   no   | no      | A multi-dimensional Double value for fast range filters.
+
+In order to support additional Kotlin types, _kotlin-search_ provides a flexible `FieldTypeMapper` interface with a
+default implementation for the native Lucene types. Custom implementations can be registered only through the
+`IndexMapper`. So far the standard `IndexManager` does not support custom mappers, but we might consider adding
+support if there are valid use cases.
+
+Lucene does not support to store multi-dimensional fields, since they're packed as a
+[BytesRef](https://lucene.apache.org/core/7_2_1/core/org/apache/lucene/util/BytesRef.html) value. This library
+does not support _ByteRef_ field types yet.
+
+The following table shows the default mapping from Kotlin to Lucene types.
+
+| Lucene Type | Kotlin Type(s)       | nullable |
+|-------------|----------------------|----------|
+| string      | String, List<String> | yes      |
+| text        | String, List<String> | yes      |
+| int         | Int, List<Int>       | yes      |
+| long        | Long, List<Long>     | yes      |
+| float       | Float, List<Float>   | yes      |
+| double      | Double, List<Double> | yes      |
+
+You can take a look at the
+[SimpleTypeMapper](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/mapper/SimpleTypeMapper.kt)
+and [ListTypeMapper](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/mapper/ListTypeMapper.kt)
+components for further information.
 
 ### Indexing documents
 
@@ -72,6 +151,8 @@ backward-compatibility with older versions, the functional DSL and object mapper
 you indexed documents using the functional DSL, you cannot use the object mapper for searching.
 
 There is a plan to support older indexes in the future, but it will require some extra configuration.
+
+The following examples create a new document within the _players_ namespace in the _spanish_ index.
 
 **Functional DSL**
 
@@ -94,21 +175,23 @@ indexManager.index("players", Language.SPANISH) {
 
 **Object Mapper**
 
-The object mapper strategy allows to use a data class to define a document structure.
+The object mapper strategy allows to use a data class to define a Lucene document structure. It uses a set of
+`FieldTypeMapper`s to transform from Kotlin objects to Lucene documents and viceversa.
 
-By default, all fields are stored, but you can override this behavior using the `@Stored` annotation.
-If marked as not stored, the field must be nullable.
+By default, fields are stored and indexed according to the Lucene default behavior for the data type, but you can
+override this behavior setting the `store` and `index` attributes in the `@IndexField` annotation. If marked as not
+stored, the field must be nullable.
 
-Fields are indexed according the field type. Look at the table below to check the default value for each type.
-Except `String` that is mapped to `Text`, all other primitive types are mapped to the underlying Lucene type.
-You can override the default type using the `@IndexFieldType` annotation.
+You can override the default Lucene type using the `@IndexFieldType` annotation.
 
 Note that the object mapper is strictly designed to map Lucene documents. You should not try to annotate your
 domain entities since it probably won't work as expected. The Kotlin field types are restricted to the supported
-Lucene field types, using other types will cause an error.
+Lucene field types, using other types will cause an error. If you want to map your custom types, you need to implement
+a `FieldTypeMapper`.
 
 ```kotlin
 import be.rlab.nlp.model.Language
+import be.rlab.nlp.model.BoolValue
 import be.rlab.search.*
 import be.rlab.search.annotation.*
 
@@ -117,8 +200,8 @@ data class Player(
     @IndexField @IndexFieldType(FieldType.STRING) val id: String,
     @IndexField val firstName: String,
     @IndexField val lastName: String,
-    @IndexField @Indexed val age: Int,
-    @IndexField @Stored(false) val score: Float?
+    @IndexField(index = BoolValue.YES) val age: Int,
+    @IndexField(store = BoolValue.YES) val score: Float?
 )
 
 val indexManager = IndexManager("/tmp/lucene-index")
@@ -131,29 +214,6 @@ mapper.index(Player(
     score = 10.0F
 ))
 ```
-
-Both examples create a new document within the _players_ namespace in the _spanish_ index. Lucene stores and indexes
-fields depending on the field type. The following table describes the supported field types and how fields
-are indexed and stored by default.
-
-| Field type | Stored | Indexed | Description
-|------------|--------|---------|-------------
-| string     |   yes  |   yes   | A String value stored exactly as it is provided.
-| text       |   yes  |   yes   | A String value that is tokenized and pre-processed by language analyzers.
-| int        |   no   |   no    | A multi-dimensional Int value for fast range filters.
-| long       |   no   |   no    | A multi-dimensional Long value for fast range filters.
-| float      |   no   |   no    | A multi-dimensional Float value for fast range filters.
-| double     |   no   |   no    | A multi-dimensional Double value for fast range filters.
-
-By default, numeric fields are not stored. In order to force the storing or indexing of a field you can apply
-the ```store()``` and ```index()``` modifiers, or the `@Stored` and `@Indexed` annotations as shown above. If a field
-is not stored, it will not be available in the _Document_ when it is retrieved from the index.
-
-Lucene does not support to store multi-dimensional fields, since they're packed as a
-[BytesRef](https://lucene.apache.org/core/7_2_1/core/org/apache/lucene/util/BytesRef.html) value. This library
-does not support _ByteRef_ field types.
-
-Column-wise fields for sorting/faceting are not supported yet.
 
 ### Searching
 
@@ -183,7 +243,7 @@ val indexManager = IndexManager("/tmp/lucene-index").apply {
         text("lasName")
         int("age")
         float("score")
-    }    
+    }
 }
 
 indexManager.search("players", Language.SPANISH) {

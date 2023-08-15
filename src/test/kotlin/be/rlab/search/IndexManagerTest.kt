@@ -37,27 +37,34 @@ class IndexManagerTest {
     @Test
     fun terms() {
         indexManager.addSchema(NAMESPACE) {
-            string(FIELD_ID)
-            int(FIELD_HASH)
+            string(FIELD_ID) {
+                docValues()
+            }
+            int(FIELD_HASH) {
+                index()
+                store()
+            }
             text(FIELD_TITLE)
             text(FIELD_DESCRIPTION)
             text(FIELD_AUTHOR_NAME)
-            text(FIELD_CATEGORY)
+            text(FIELD_CATEGORY) {
+                docValues()
+            }
         }
 
         indexManager.index(NAMESPACE, Language.SPANISH) {
             string(FIELD_ID, UUID.randomUUID().toString())
             int(FIELD_HASH, 1234)
-            text(FIELD_TITLE, "Memorias del subsuelo")
+            field(FIELD_TITLE, "Memorias del subsuelo")
             text(FIELD_DESCRIPTION, "Antihéroes de su ingente producción novelística") {
-                store(true)
+                store()
             }
             text(FIELD_AUTHOR_NAME, "Fiódor Dostoyevski") {
-                store(true)
+                store()
             }
             listOf("Drama", "Filosófico", "Psicológico").forEach { category ->
                 text(FIELD_CATEGORY, category) {
-                    store(true)
+                    store()
                 }
             }
         }
@@ -91,7 +98,7 @@ class IndexManagerTest {
             title = "Memorias del subsuelo",
             description = "Antihéroes de su ingente producción novelística",
             authorName = "Fiódor Dostoyevski",
-            category = "Drama"
+            categories = listOf("Drama", "Filosófico", "Psicológico")
         )
         val mapper = IndexMapper(indexManager)
         mapper.index(book)

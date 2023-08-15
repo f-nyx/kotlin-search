@@ -2,10 +2,12 @@ package be.rlab.search
 
 import be.rlab.nlp.model.Language
 import be.rlab.search.Hashes.getLanguage
+import be.rlab.search.LuceneFieldUtils.privateField
 import be.rlab.search.LuceneIndex.Companion.ID_FIELD
 import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
-import be.rlab.search.LuceneIndex.Companion.privateField
 import be.rlab.search.model.*
+import be.rlab.search.model.DocumentSchema
+import be.rlab.search.schema.DocumentSchemaBuilder
 import org.apache.lucene.analysis.Analyzer
 import org.apache.lucene.index.*
 import org.apache.lucene.search.IndexSearcher
@@ -44,7 +46,7 @@ class IndexManager(
     }
 
     /** Indexes per language. */
-    private val indexes: MutableMap<Language, LuceneIndex> = Language.values().associateWith { language ->
+    private val indexes: MutableMap<Language, LuceneIndex> = Language.entries.associateWith { language ->
         val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.lowercase()).toPath())
         val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
         val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
@@ -61,7 +63,7 @@ class IndexManager(
     }.toMutableMap()
 
     /** Registered document schemas. */
-    private val schemas: MutableMap<String, DocumentSchema<*>> = mutableMapOf()
+    private val schemas: MutableMap<String, DocumentSchema> = mutableMapOf()
 
     /** Returns the index for the specified language.
      * @param language Language of the required index.
@@ -83,7 +85,15 @@ class IndexManager(
         language: Language,
         builder: DocumentBuilder.() -> Unit
     ) {
-        index(DocumentBuilder.new(namespace, language, "1", builder).build())
+        index(
+            DocumentBuilder.new(
+                namespace,
+                language,
+                LuceneIndex.CURRENT_VERSION,
+                schemas[namespace],
+                builder
+            ).build()
+        )
     }
 
     /** Analyzes and indexes a document.
@@ -120,7 +130,7 @@ class IndexManager(
     ): Int {
         val schema = schemas[namespace]
         val query = schema?.let {
-            QueryBuilder.forSchema(schema, language, NAMESPACE_FIELD).apply(builder)
+            QueryBuilder.forSchema(schema, language, privateField(NAMESPACE_FIELD)).apply(builder)
         } ?: QueryBuilder.query(namespace, language).apply(builder)
 
         return with(searcher(query.language)) {
@@ -150,7 +160,7 @@ class IndexManager(
     ): SearchResult {
         val schema = schemas[namespace]
         val query = schema?.let {
-            QueryBuilder.forSchema(schema, language, NAMESPACE_FIELD).apply(builder)
+            QueryBuilder.forSchema(schema, language, privateField(NAMESPACE_FIELD)).apply(builder)
         } ?: QueryBuilder.query(namespace, language).apply(builder)
         return search(query, cursor, limit)
     }
@@ -242,9 +252,9 @@ class IndexManager(
 
     fun addSchema(
         namespace: String,
-        builder: SchemaBuilder.() -> Unit
+        builder: DocumentSchemaBuilder.() -> Unit
     ): IndexManager = apply {
-        schemas[namespace] = SchemaBuilder.new(namespace, builder).build()
+        schemas[namespace] = DocumentSchemaBuilder.new(namespace, builder).build()
     }
 
     private fun transform(

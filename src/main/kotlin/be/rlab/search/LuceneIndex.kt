@@ -1,13 +1,19 @@
 package be.rlab.search
 
 import be.rlab.nlp.model.Language
+import be.rlab.search.LuceneFieldUtils.PRIVATE_FIELD_PREFIX
+import be.rlab.search.LuceneFieldUtils.addField
+import be.rlab.search.LuceneFieldUtils.booleanValue
+import be.rlab.search.LuceneFieldUtils.privateField
 import be.rlab.search.model.Document
+import be.rlab.search.model.Field
 import be.rlab.search.model.FieldType
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.document.*
 import org.apache.lucene.index.IndexReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexableField
+import org.apache.lucene.document.*
+import org.apache.lucene.document.Field as LuceneField
 import org.apache.lucene.document.Document as LuceneDocument
 
 /** Represents a Lucene index.
@@ -25,25 +31,13 @@ class LuceneIndex(
 ) {
     companion object {
         const val CURRENT_VERSION: String = "2"
-        internal const val PRIVATE_FIELD_PREFIX: String = "private!!"
         internal const val ID_FIELD: String = "id"
         internal const val NAMESPACE_FIELD: String = "namespace"
         internal const val VERSION_FIELD: String = "version"
-        private const val FIELD_TYPE: String = "type"
-        private val NUMERIC_TYPES: List<FieldType> = listOf(
-            FieldType.INT, FieldType.LONG, FieldType.FLOAT, FieldType.DOUBLE
-        )
-
-        internal fun privateField(
-            name: String,
-            version: String = CURRENT_VERSION
-        ): String {
-            return when (version) {
-                "1" -> name
-                "2" -> "${PRIVATE_FIELD_PREFIX}$name"
-                else -> throw RuntimeException("invalid document version: $version")
-            }
-        }
+        internal const val TYPE_FIELD: String = "type"
+        internal const val STORED_FIELD: String = "stored"
+        internal const val INDEXED_FIELD: String = "indexed"
+        internal const val DOC_VALUES_FIELD: String = "docValues"
     }
 
     /** Updates the index reader.
@@ -70,47 +64,11 @@ class LuceneIndex(
      * @param document Document to map.
      * @return The Lucene Document object.
      */
+    @Suppress("UNCHECKED_CAST")
     fun map(document: Document): LuceneDocument = LuceneDocument().apply {
-        add(StringField(privateField(ID_FIELD, document.version), document.id, Field.Store.YES))
-        add(StringField(privateField(NAMESPACE_FIELD, document.version), document.namespace, Field.Store.YES))
-
-        document.fields.forEach { field ->
-            val newField = when (field.type) {
-                FieldType.STRING ->
-                    StringField(field.name, field.value as String, if (field.stored) {
-                        Field.Store.YES
-                    } else {
-                        Field.Store.NO
-                    })
-
-                FieldType.TEXT -> TextField(field.name, field.value as String, if (field.stored) {
-                    Field.Store.YES
-                } else {
-                    Field.Store.NO
-                })
-
-                FieldType.INT -> IntPoint(field.name, *toArray(field.value) as IntArray)
-                FieldType.LONG -> LongPoint(field.name, *toArray(field.value) as LongArray)
-                FieldType.FLOAT -> FloatPoint(field.name, *toArray(field.value) as FloatArray)
-                FieldType.DOUBLE -> DoublePoint(field.name, *toArray(field.value) as DoubleArray)
-            }
-
-            if (field.stored && NUMERIC_TYPES.contains(field.type)) {
-                newField.numericValue()?.let { value ->
-                    add(when (newField) {
-                        is IntPoint -> StoredField(newField.name(), value.toInt())
-                        is LongPoint -> StoredField(newField.name(), value.toLong())
-                        is FloatPoint -> StoredField(newField.name(), value.toFloat())
-                        is DoublePoint -> StoredField(newField.name(), value.toDouble())
-                        else -> throw RuntimeException("unknown numeric field type: ${field.type}")
-                    })
-                }
-            }
-
-            add(newField)
-            add(StringField(privateField("${field.name}!!${FIELD_TYPE}", document.version), field.type.name, Field.Store.YES))
-            add(StringField(privateField(VERSION_FIELD), document.version, Field.Store.YES))
-        }
+        add(StringField(privateField(ID_FIELD, document.version), document.id, LuceneField.Store.YES))
+        add(StringField(privateField(NAMESPACE_FIELD, document.version), document.namespace, LuceneField.Store.YES))
+        document.fields.forEach { field: Field<*> -> addField(field as Field<Any>, document.version) }
     }
 
     /** Maps a Lucene document to the Document model.
@@ -129,35 +87,34 @@ class LuceneIndex(
                 when(version) {
                     "1" ->
                         field.name() != ID_FIELD &&
-                            field.name() != NAMESPACE_FIELD &&
-                            field.name() != privateField(VERSION_FIELD) &&
-                            !field.name().contains("!!")
+                        field.name() != NAMESPACE_FIELD &&
+                        field.name() != privateField(VERSION_FIELD) &&
+                        !field.name().contains("!!")
                     "2" -> !field.name().startsWith(PRIVATE_FIELD_PREFIX)
                     else -> throw RuntimeException("invalid document version: $version")
                 }
-            }.map { field: IndexableField ->
-                be.rlab.search.model.Field(
-                    name = field.name(),
-                    value = field.numericValue()
-                        ?: field.stringValue()
-                        ?: field.binaryValue()
-                        ?: field.readerValue(),
-                    type = FieldType.valueOf(
-                        luceneDoc.getField(privateField("${field.name()}!!$FIELD_TYPE", version)).stringValue()
-                    )
+            }.fold(mutableMapOf<String, Field<Any>>()) { fieldsMap, field: IndexableField ->
+                val fieldType = FieldType.valueOf(
+                    luceneDoc.getField(privateField("${field.name()}!!$TYPE_FIELD", version)).stringValue()
                 )
-            }
+                val value = field.numericValue()
+                    ?: field.stringValue()
+                    ?: field.binaryValue()
+                    ?: field.readerValue().readText()
+                if (!fieldsMap.containsKey(field.name())) {
+                    fieldsMap[field.name()] = Field(
+                        name = field.name(),
+                        values = listOf(value),
+                        type = fieldType,
+                        stored = luceneDoc.getField(privateField(STORED_FIELD, version)).booleanValue() ?: fieldType.stored,
+                        indexed = luceneDoc.getField(privateField(INDEXED_FIELD, version)).booleanValue() ?: fieldType.indexed,
+                        docValues = luceneDoc.getField(privateField(DOC_VALUES_FIELD, version)).booleanValue() ?: false
+                    )
+                } else {
+                    fieldsMap[field.name()] = fieldsMap.getValue(field.name()).addValues(listOf(value))
+                }
+                fieldsMap
+            }.values.toList()
         )
-    }
-
-    private fun toArray(source: Any): Any {
-        return when (source) {
-            is IntArray, is LongArray, is FloatArray, is DoubleArray -> source
-            is Int -> intArrayOf(source)
-            is Long -> longArrayOf(source)
-            is Float -> floatArrayOf(source)
-            is Double -> doubleArrayOf(source)
-            else -> throw RuntimeException("Unsupported numeric value: $source")
-        }
     }
 }

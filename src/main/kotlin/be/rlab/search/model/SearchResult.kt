@@ -1,8 +1,5 @@
 package be.rlab.search.model
 
-import be.rlab.search.DocumentDataBinder
-import kotlin.reflect.KClass
-
 /** Represents a set of paginated search results.
  */
 data class SearchResult(
@@ -24,15 +21,5 @@ data class SearchResult(
                 total = total,
                 next = next
             )
-    }
-
-    fun<T : Any> mapAs(type: KClass<T>): List<T> {
-        val binder = DocumentDataBinder()
-        return docs.map { source -> binder.bind(source, type) }
-    }
-
-    inline fun<reified T : Any> mapAs(): List<T> {
-        val binder = DocumentDataBinder()
-        return docs.map { source -> binder.bind(source) }
     }
 }
