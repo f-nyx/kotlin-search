@@ -43,7 +43,7 @@ class FieldSchemaBuilder private constructor (
             val stored: Boolean? = property.findAnnotation<Stored>()?.value
                 ?: if (field.store == BoolValue.DEFAULT) null else field.store == BoolValue.YES
             val indexed: Boolean? = property.findAnnotation<Indexed>()?.value
-                ?: if (field.index == BoolValue.DEFAULT) null else field.store == BoolValue.YES
+                ?: if (field.index == BoolValue.DEFAULT) null else field.index == BoolValue.YES
             val docValues: Boolean = field.docValues
 
             val builder = FieldSchemaBuilder(name)

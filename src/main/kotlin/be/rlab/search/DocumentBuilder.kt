@@ -21,32 +21,26 @@ class DocumentBuilder private constructor (
             language: Language,
             version: String,
             schema: DocumentSchema?,
-            callback: DocumentBuilder.() -> Unit
-        ): DocumentBuilder {
-            val builder = DocumentBuilder(namespace, language, schema, version)
-            callback(builder)
-            return builder
-        }
+        ): DocumentBuilder = DocumentBuilder(namespace, language, schema, version)
 
         @Suppress("UNCHECKED_CAST")
-        fun<T : Any> buildFromObject(
+        fun<T : Any> fromObject(
             schema: DocumentSchema,
+            language: Language,
             source: T,
             version: String
-        ): List<Document> {
-            return schema.languages.map { language ->
-                val properties = source::class.declaredMemberProperties
-                    .filter { property -> schema.findField(property.name) != null }
-                properties.fold(DocumentBuilder(schema.namespace, language, schema, version)) { builder, property ->
-                    val value = (property as KProperty1<Any, *>).get(source)
-                    requireNotNull(value) { "the field value cannot be null" }
+        ): DocumentBuilder {
+            val properties = source::class.declaredMemberProperties
+                .filter { property -> schema.findField(property.name) != null }
+            return properties.fold(DocumentBuilder(schema.namespace, language, schema, version)) { builder, property ->
+                val value = (property as KProperty1<Any, *>).get(source)
+                requireNotNull(value) { "the field value cannot be null" }
 
-                    if (value is List<*>) {
-                        builder.field(property.name, values = value.toTypedArray() as Array<Any>)
-                    } else {
-                        builder.field(property.name, value)
-                    }
-                }.build()
+                if (value is List<*>) {
+                    builder.field(property.name, values = value.toTypedArray() as Array<Any>)
+                } else {
+                    builder.field(property.name, value)
+                }
             }
         }
     }

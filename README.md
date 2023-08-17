@@ -72,14 +72,14 @@ that querying the index is analog to query a collection in a no-sql database.
 
 Lucene fields have some attributes that are used in index-time to determine how the field is processed by the index.
 The `stored` attribute tells Lucene to store the field value in the index. The `indexed` attribute indicates that a
-field will be used for search, so it needs to be processed for that purpose. The `docValues` attribute makes a field
+field will be used for search, so it needs to be processed for that purpose. The `docValues` attribute marks a field
 to be saved in a dedicated document-level space, which makes sorting and faceting much faster.
 
 Each Lucene data type provides a default value for all these attributes (look at the data types section below). If you
 want to change the behavior of a field, you should change it for each field and each document. In order to make it
 easier, _kotlin-search_ introduces the concept of `document schemas`. A document schema allows to pre-define a set of
 fields and its preferred attributes for a document. It provides data type validation out of the box, and it can be
-configured at index level.
+added to the `IndexManager`.
 
 The following example adds a document schema for the namespace `players` using the Functional DSL. For the Object
 Mapper, the document schema is automatically created based on the annotations (look at the
@@ -195,7 +195,7 @@ import be.rlab.nlp.model.BoolValue
 import be.rlab.search.*
 import be.rlab.search.annotation.*
 
-@IndexDocument(namespace = "players", languages = [Language.SPANISH])
+@IndexDocument(namespace = "players")
 data class Player(
     @IndexField @IndexFieldType(FieldType.STRING) val id: String,
     @IndexField val firstName: String,
@@ -212,7 +212,7 @@ mapper.index(Player(
     lastName = "Pérez",
     age = 27,
     score = 10.0F
-))
+), Language.SPANISH)
 ```
 
 ### Searching
@@ -297,6 +297,74 @@ indexManager.search("players", Language.SPANISH) {
 ```
 
 Faceted search is not supported yet.
+
+### Sorting
+
+Sorting search results requires to mark fields as `DocValues` before indexing. `DocValues` is a fast document-level
+index used for sorting and faceting. You can mark a field using both the Functional DSL and the Object Mapper.
+
+The query builder provides a `sortBy()` clause that allows to specify a list of fields to sort results by. Note that
+using the `sortBy()` clause requires a valid document schema. Sorting documents without an explicit document schema
+is not supported, since the sorting criteria depends on the data type (look at the Document Schemas section above).
+
+**Functional DSL**
+
+```kotlin
+import be.rlab.nlp.model.Language
+import be.rlab.search.IndexManager
+
+val indexManager = IndexManager("/tmp/lucene-index")
+
+indexManager.index("players", Language.SPANISH) {
+    string("id", "player-id-1234")
+    text("firstName", "Juan")
+    text("lastName", "Pérez")
+    int("age", 27) {
+        store()
+    }
+    float("score", 10.0F) {
+        docValues()
+    }
+}
+
+indexManager.search("players", Language.SPANISH) {
+    range("age", 20, 30)
+    sortBy("score")
+}
+```
+
+**Object Mapper**
+
+```kotlin
+import be.rlab.nlp.model.Language
+import be.rlab.nlp.model.BoolValue
+import be.rlab.search.*
+import be.rlab.search.annotation.*
+
+@IndexDocument(namespace = "players")
+data class Player(
+    @IndexField @IndexFieldType(FieldType.STRING) val id: String,
+    @IndexField val firstName: String,
+    @IndexField val lastName: String,
+    @IndexField(index = BoolValue.YES) val age: Int,
+    @IndexField(store = BoolValue.YES, docValues = true) val score: Float?
+)
+
+val indexManager = IndexManager("/tmp/lucene-index")
+val mapper = IndexMapper(indexManager)
+
+mapper.index(Player(
+    firstName = "Juan",
+    lastName = "Pérez",
+    age = 27,
+    score = 10.0F
+), Language.SPANISH)
+
+mapper.search<Player>(Language.SPANISH) {
+    range(Player::age, 20, 30)
+    sortBy(Player::score)
+}
+```
 
 ### Query parsing
 

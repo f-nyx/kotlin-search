@@ -2,18 +2,13 @@ package be.rlab.search
 
 import be.rlab.nlp.model.Language
 import be.rlab.search.Hashes.getLanguage
-import be.rlab.search.LuceneFieldUtils.privateField
-import be.rlab.search.LuceneIndex.Companion.ID_FIELD
-import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
 import be.rlab.search.model.*
-import be.rlab.search.model.DocumentSchema
 import be.rlab.search.schema.DocumentSchemaBuilder
 import org.apache.lucene.analysis.Analyzer
-import org.apache.lucene.index.*
-import org.apache.lucene.search.IndexSearcher
-import org.apache.lucene.search.ScoreDoc
-import org.apache.lucene.search.TermQuery
-import org.apache.lucene.search.TopDocs
+import org.apache.lucene.index.DirectoryReader
+import org.apache.lucene.index.IndexReader
+import org.apache.lucene.index.IndexWriter
+import org.apache.lucene.index.IndexWriterConfig
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import org.slf4j.Logger
@@ -69,9 +64,9 @@ class IndexManager(
      * @param language Language of the required index.
      * @return The required index.
      */
-    fun index(language: Language): LuceneIndex {
-        indexReader(language)
-        return indexes.getValue(language)
+    fun openIndex(language: Language): LuceneIndex {
+        logger.debug("opening index for language: $language")
+        return indexes.getValue(language).reopenIfChanged()
     }
 
     /** Analyzes and indexes a document.
@@ -90,9 +85,8 @@ class IndexManager(
                 namespace,
                 language,
                 LuceneIndex.CURRENT_VERSION,
-                schemas[namespace],
-                builder
-            ).build()
+                schemas[namespace]
+            ).apply(builder).build()
         )
     }
 
@@ -100,9 +94,7 @@ class IndexManager(
      * @param document Document to index.
      */
     fun index(document: Document) {
-        val language: Language = getLanguage(document.id)
-        val index: LuceneIndex = indexes.getValue(language)
-        index.addDocument(document)
+        openIndex(getLanguage(document.id)).addDocument(document)
     }
 
     /** Retrieves a document by id.
@@ -110,11 +102,7 @@ class IndexManager(
      * @return the required document, or null if it does not exist.
      */
     fun get(documentId: String): Document? {
-        val language = getLanguage(documentId)
-        return with(searcher(language)) {
-            val topDocs = search(TermQuery(Term(privateField(ID_FIELD), documentId)), 1)
-            transform(index(language), this, topDocs).docs.firstOrNull()
-        }
+        return openIndex(getLanguage(documentId)).getDocumentById(documentId)
     }
 
     /** Counts search results.
@@ -129,13 +117,11 @@ class IndexManager(
         builder: QueryBuilder.() -> Unit
     ): Int {
         val schema = schemas[namespace]
-        val query = schema?.let {
-            QueryBuilder.forSchema(schema, language, privateField(NAMESPACE_FIELD)).apply(builder)
+        val queryBuilder = schema?.let {
+            QueryBuilder.forSchema(schema, language).apply(builder)
         } ?: QueryBuilder.query(namespace, language).apply(builder)
 
-        return with(searcher(query.language)) {
-            count(query.build())
-        }
+        return openIndex(language).count(queryBuilder)
     }
 
     /** Search for documents in a specific language.
@@ -159,10 +145,10 @@ class IndexManager(
         builder: QueryBuilder.() -> Unit
     ): SearchResult {
         val schema = schemas[namespace]
-        val query = schema?.let {
-            QueryBuilder.forSchema(schema, language, privateField(NAMESPACE_FIELD)).apply(builder)
+        val queryBuilder = schema?.let {
+            QueryBuilder.forSchema(schema, language).apply(builder)
         } ?: QueryBuilder.query(namespace, language).apply(builder)
-        return search(query, cursor, limit)
+        return openIndex(language).search(queryBuilder, cursor, limit)
     }
 
     /** Search for documents.
@@ -170,27 +156,16 @@ class IndexManager(
      * The cursor and the limit allow to paginate the search results. If you provide a cursor returned
      * in a previous [SearchResult], this method resumes the search from there.
      *
-     * @param query Query builder ready for search.
+     * @param queryBuilder Query builder ready for search.
      * @param cursor Cursor to resume a paginated search.
      * @param limit Max number of results to retrieve.
      */
     fun search(
-        query: QueryBuilder,
+        queryBuilder: QueryBuilder,
         cursor: Cursor = Cursor.first(),
         limit: Int = DEFAULT_LIMIT
     ): SearchResult {
-        return with(searcher(query.language)) {
-            if (cursor.isFirst()) {
-                transform(index(query.language), this, search(query.build(), limit))
-            } else {
-                val scoreDoc = ScoreDoc(
-                    cursor.docId,
-                    cursor.score,
-                    cursor.shardIndex
-                )
-                transform(index(query.language), this, searchAfter(scoreDoc, query.build(), limit))
-            }
-        }
+        return openIndex(queryBuilder.language).search(queryBuilder, cursor, limit)
     }
 
     /** Search for documents in a specific language.
@@ -209,30 +184,20 @@ class IndexManager(
         limit: Int = DEFAULT_LIMIT,
         builder: QueryBuilder.() -> Unit
     ): Sequence<Document> {
-        var result: SearchResult = search(namespace, language, Cursor.first(), limit, builder)
-        var docs: Iterator<Document> = result.docs.iterator()
+        val schema = schemas[namespace]
+        val queryBuilder = schema?.let {
+            QueryBuilder.forSchema(schema, language).apply(builder)
+        } ?: QueryBuilder.query(namespace, language).apply(builder)
 
-        fun next(): Document? = when {
-            docs.hasNext() -> docs.next()
-            !docs.hasNext() && result.next != null -> {
-                result = search(namespace, language, result.next!!, limit, builder)
-                docs = result.docs.iterator()
-                next()
-            }
-            else -> null
-        }
-
-        return generateSequence {
-            next()
-        }
+        return openIndex(language).find(queryBuilder, limit)
     }
 
     /** Synchronizes and writes all pending changes to disk.
      */
     fun sync() {
         logger.debug("writing all indexes to disk")
-        Language.values().forEach { language ->
-            indexes.getValue(language).indexWriter.commit()
+        Language.entries.forEach { language ->
+            openIndex(language).sync()
         }
     }
 
@@ -241,12 +206,8 @@ class IndexManager(
      */
     fun close(sync: Boolean = true) {
         logger.debug("closing index manager")
-        if (sync) {
-            sync()
-        }
-
-        Language.values().forEach { language ->
-            indexes.getValue(language).indexWriter.close()
+        Language.entries.forEach { language ->
+            openIndex(language).close(sync)
         }
     }
 
@@ -255,49 +216,5 @@ class IndexManager(
         builder: DocumentSchemaBuilder.() -> Unit
     ): IndexManager = apply {
         schemas[namespace] = DocumentSchemaBuilder.new(namespace, builder).build()
-    }
-
-    private fun transform(
-        index: LuceneIndex,
-        searcher: IndexSearcher,
-        topDocs: TopDocs
-    ): SearchResult {
-
-        val resolvedDocs: List<Document> = topDocs.scoreDocs.map { scoreDoc ->
-            val luceneDoc = searcher.doc(scoreDoc.doc)
-            index.map(luceneDoc)
-        }
-
-        return SearchResult.new(
-            results = resolvedDocs,
-            total = topDocs.totalHits.value,
-            next = if (resolvedDocs.isNotEmpty()) {
-                val nextDoc = topDocs.scoreDocs.last()
-                Cursor(
-                    nextDoc.doc,
-                    nextDoc.score,
-                    nextDoc.shardIndex
-                )
-            } else {
-                null
-            }
-        )
-    }
-
-    private fun searcher(language: Language): IndexSearcher {
-        logger.debug("creating index searcher for language: $language")
-        return IndexSearcher(indexReader(language))
-    }
-
-    private fun indexReader(language: Language): IndexReader {
-        logger.debug("loading index reader for language: $language")
-        val indexReader = indexes.getValue(language).indexReader
-
-        DirectoryReader.openIfChanged(indexReader as DirectoryReader)?.let { nextReader ->
-            logger.debug("index changed, reloaded from disk")
-            indexes[language] = indexes.getValue(language).update(nextReader)
-        }
-
-        return indexes.getValue(language).indexReader
     }
 }

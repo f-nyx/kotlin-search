@@ -1,6 +1,5 @@
 package be.rlab.search.schema
 
-import be.rlab.nlp.model.Language
 import be.rlab.search.annotation.IndexDocument
 import be.rlab.search.annotation.IndexField
 import be.rlab.search.mapper.FieldTypeMapper
@@ -42,7 +41,6 @@ class DocumentSchemaBuilder private constructor (
 
             return DocumentSchema(
                 namespace = docInfo.namespace,
-                languages = docInfo.languages.toList(),
                 fields = fields
             )
         }
@@ -112,7 +110,6 @@ class DocumentSchemaBuilder private constructor (
     fun build(): DocumentSchema {
         return DocumentSchema.new(
             namespace = namespace,
-            languages = Language.entries,
             fields = fields
         )
     }

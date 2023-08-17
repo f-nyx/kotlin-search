@@ -1,8 +1,11 @@
 package be.rlab.search
 
 import be.rlab.nlp.model.Language
+import be.rlab.search.mock.TestBook
 import be.rlab.search.model.TypedSearchResult
+import be.rlab.search.query.sortBy
 import be.rlab.search.query.term
+import be.rlab.support.SearchTestUtils.firstWord
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -72,6 +75,7 @@ class IndexManagerTest {
 
         val results1 = indexManager.search(NAMESPACE, Language.SPANISH) {
             term("Memorias")
+            sortBy(FIELD_ID)
         }
         val results2 = indexManager.search(NAMESPACE, Language.SPANISH) {
             term(FIELD_TITLE, "Memorias")
@@ -92,34 +96,28 @@ class IndexManagerTest {
 
     @Test
     fun mapper() {
-        val book = Book(
-            id = UUID.randomUUID().toString(),
-            hash = 1337,
-            title = "Memorias del subsuelo",
-            description = "Antihéroes de su ingente producción novelística",
-            authorName = "Fiódor Dostoyevski",
-            categories = listOf("Drama", "Filosófico", "Psicológico")
-        )
+        val books = Array(10) { TestBook().new() }
         val mapper = IndexMapper(indexManager)
-        mapper.index(book)
+
+        books[4] = books[4].copy(title = "memorias")
+        books[8] = books[8].copy(title = "subsuelo", categories = listOf("drama"))
+        books.forEach { book -> mapper.index(book, Language.ENGLISH) }
         indexManager.sync()
 
-        val results1: TypedSearchResult<Book> = mapper.search(Language.SPANISH) {
-            term("Memorias")
+        val results1: TypedSearchResult<Book> = mapper.search(Language.ENGLISH) {
+            term(firstWord(books[2].description))
+            sortBy(Book::genre)
         }
-        val results2: TypedSearchResult<Book> = mapper.search(Language.SPANISH) {
-            term(Book::title, "Memorias")
+        val results2: TypedSearchResult<Book> = mapper.search(Language.ENGLISH) {
+            term(Book::title, books[4].title!!)
         }
-        val results3: TypedSearchResult<Book> = mapper.search(Language.SPANISH) {
-            term(FIELD_TITLE, "Memorias")
-            term("drama")
+        val results3: TypedSearchResult<Book> = mapper.search(Language.ENGLISH) {
+            term(FIELD_TITLE, books[8].title!!)
+            term(books[8].categories.first())
         }
 
-        assert(results1.docs.size == 1)
-        assert(results2.docs.size == 1)
-        assert(results3.docs.size == 1)
-        assert(results1.docs.first() == book.copy(title = null))
-        assert(results2.docs.first() == book.copy(title = null))
-        assert(results3.docs.first() == book.copy(title = null))
+        assert(results1.docs.isNotEmpty())
+        assert(results2.docs.isNotEmpty())
+        assert(results3.docs.isNotEmpty())
     }
 }

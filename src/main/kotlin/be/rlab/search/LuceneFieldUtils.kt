@@ -1,16 +1,13 @@
 package be.rlab.search
 
-import be.rlab.search.LuceneIndex.Companion.DOC_VALUES_FIELD
-import be.rlab.search.LuceneIndex.Companion.INDEXED_FIELD
-import be.rlab.search.LuceneIndex.Companion.STORED_FIELD
-import be.rlab.search.LuceneIndex.Companion.VERSION_FIELD
+import be.rlab.search.LuceneIndex.Companion.METADATA_FIELD
 import be.rlab.search.model.Field
+import be.rlab.search.model.FieldMetadata
 import be.rlab.search.model.FieldType
-import org.apache.lucene.util.BytesRef
 import org.apache.lucene.document.*
-import org.apache.lucene.index.IndexableField
-import org.apache.lucene.document.Field as LuceneField
+import org.apache.lucene.util.BytesRef
 import org.apache.lucene.document.Document as LuceneDocument
+import org.apache.lucene.document.Field as LuceneField
 
 object LuceneFieldUtils {
     const val PRIVATE_FIELD_PREFIX: String = "private!!"
@@ -37,15 +34,16 @@ object LuceneFieldUtils {
 
         add(
             StringField(
-                privateField("${field.name}!!${LuceneIndex.TYPE_FIELD}", version),
-                field.type.name,
-                org.apache.lucene.document.Field.Store.YES
+                privateField("${field.name}!!$METADATA_FIELD", version),
+                FieldMetadata(
+                    type = field.type,
+                    stored = field.stored,
+                    indexed = field.indexed,
+                    docValues = field.docValues
+                ).serialize(),
+                LuceneField.Store.YES
             )
         )
-        add(StringField(privateField(VERSION_FIELD), version, LuceneField.Store.YES))
-        add(StringField(privateField(STORED_FIELD), if (field.stored) "1" else "0", LuceneField.Store.YES))
-        add(StringField(privateField(INDEXED_FIELD), if (field.indexed) "1" else "0", LuceneField.Store.YES))
-        add(StringField(privateField(DOC_VALUES_FIELD), if (field.docValues) "1" else "0", LuceneField.Store.YES))
     }
 
     fun privateField(
@@ -56,16 +54,6 @@ object LuceneFieldUtils {
             "1" -> name
             "2" -> "${PRIVATE_FIELD_PREFIX}$name"
             else -> throw RuntimeException("invalid document version: $version")
-        }
-    }
-
-    fun IndexableField.booleanValue(): Boolean? {
-        return stringValue()?.let { value ->
-            when (value) {
-                "0" -> false
-                "1" -> true
-                else -> false
-            }
         }
     }
 

@@ -21,11 +21,10 @@ class IndexMapper(
     /** Analyzes and indexes a document reading the configuration from annotations.
      * @param source Document to index. Must be annotated with the proper annotations.
      */
-    fun<T : Any> index(source: T) {
-        val schema = DocumentSchemaBuilder.buildFromClass(source::class, fieldTypeMappers) as DocumentSchema
-        DocumentBuilder.buildFromObject(schema, source, LuceneIndex.CURRENT_VERSION).forEach { doc ->
-            indexManager.index(doc)
-        }
+    fun<T : Any> index(source: T, language: Language) {
+        val schema = DocumentSchemaBuilder.buildFromClass(source::class, fieldTypeMappers)
+        val builder = DocumentBuilder.fromObject(schema, language, source, LuceneIndex.CURRENT_VERSION)
+        indexManager.index(builder.build())
     }
 
     /** Search for documents in a specific language.

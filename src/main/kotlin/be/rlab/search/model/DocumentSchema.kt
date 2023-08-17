@@ -1,21 +1,16 @@
 package be.rlab.search.model
 
-import be.rlab.nlp.model.Language
-
 data class DocumentSchema(
     val namespace: String,
-    val languages: List<Language>,
     val fields: List<FieldSchema>
 ) {
     companion object {
 
         fun new(
             namespace: String,
-            languages: List<Language>,
             fields: List<FieldSchema>
         ): DocumentSchema = DocumentSchema(
             namespace = namespace,
-            languages = languages,
             fields = fields
         )
     }
