@@ -9,6 +9,8 @@ import org.apache.lucene.index.DirectoryReader
 import org.apache.lucene.index.IndexReader
 import org.apache.lucene.index.IndexWriter
 import org.apache.lucene.index.IndexWriterConfig
+import org.apache.lucene.search.similarities.BM25Similarity
+import org.apache.lucene.search.similarities.Similarity
 import org.apache.lucene.store.Directory
 import org.apache.lucene.store.FSDirectory
 import org.slf4j.Logger
@@ -33,15 +35,39 @@ import java.io.File
  */
 class IndexManager(
     /** Path to store indexes. */
-    indexPath: String
+    indexPath: String,
+    /** Index configuration. */
+    indexConfig: IndexConfig = IndexConfig.default()
 ) {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(IndexManager::class.java)
         const val DEFAULT_LIMIT: Int = 1000
     }
 
+    /** Builder to construct a new configured [IndexManager].
+     */
+    class Builder(private val indexPath: String) {
+        private var similarity: Similarity = BM25Similarity()
+        private var supportedLanguages: List<Language> = Language.entries
+
+        fun withSimilarity(newSimilarity: Similarity): Builder = apply {
+            similarity = newSimilarity
+        }
+
+        fun forLanguages(languages: List<Language>): Builder = apply {
+            supportedLanguages = languages
+        }
+
+        fun build(): IndexManager {
+            return IndexManager(indexPath, IndexConfig.new(
+                supportedLanguages = supportedLanguages,
+                similarity = similarity
+            ))
+        }
+    }
+
     /** Indexes per language. */
-    private val indexes: MutableMap<Language, LuceneIndex> = Language.entries.associateWith { language ->
+    private val indexes: MutableMap<Language, LuceneIndex> = indexConfig.supportedLanguages.associateWith { language ->
         val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.lowercase()).toPath())
         val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
         val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
@@ -53,7 +79,8 @@ class IndexManager(
             language = language,
             analyzer = analyzer,
             indexReader = indexReader,
-            indexWriter = indexWriter
+            indexWriter = indexWriter,
+            indexConfig = indexConfig
         )
     }.toMutableMap()
 

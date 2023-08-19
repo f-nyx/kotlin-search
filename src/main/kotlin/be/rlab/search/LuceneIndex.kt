@@ -28,7 +28,8 @@ class LuceneIndex(
     val language: Language,
     val analyzer: Analyzer,
     var indexReader: IndexReader,
-    val indexWriter: IndexWriter
+    val indexWriter: IndexWriter,
+    val indexConfig: IndexConfig
 ) {
     companion object {
         private val logger: Logger = LoggerFactory.getLogger(LuceneIndex::class.java)
@@ -234,7 +235,9 @@ class LuceneIndex(
 
     private fun searcher(language: Language): IndexSearcher {
         logger.debug("creating index searcher for language: $language")
-        return IndexSearcher(indexReader)
+        return IndexSearcher(indexReader).apply {
+            similarity = indexConfig.similarity
+        }
     }
 
     /** Retrieves all documents for the specified search results.

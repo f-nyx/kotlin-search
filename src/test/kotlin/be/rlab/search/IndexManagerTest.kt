@@ -6,6 +6,7 @@ import be.rlab.search.model.TypedSearchResult
 import be.rlab.search.query.sortBy
 import be.rlab.search.query.term
 import be.rlab.support.SearchTestUtils.firstWord
+import org.apache.lucene.search.similarities.BM25Similarity
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -29,7 +30,10 @@ class IndexManagerTest {
     @BeforeEach
     fun setUp() {
         indexDir.deleteRecursively()
-        indexManager = IndexManager(indexDir.absolutePath)
+        indexManager = IndexManager.Builder(indexDir.absolutePath)
+            .forLanguages(Language.entries)
+            .withSimilarity(BM25Similarity())
+            .build()
     }
 
     @AfterEach

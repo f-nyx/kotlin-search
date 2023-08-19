@@ -1,8 +1,8 @@
 # kotlin-search
 
-This is a basic multi-language index implementation that can be embedded into applications. It is useful for
+This is a simple multi-language index implementation that can be embedded into applications. It is useful for
 applications that require full-text search and natural language processing support without adding a full-featured
-search engine like Elastic Search.
+search engine server like Elastic Search.
 
 This library is built on top of Lucene and it does not implement any search or NLP algorithm. It wraps Lucene
 to provide the following features:
@@ -47,19 +47,29 @@ necessary to avoid classpath errors.
 
 ## Multi-language search index
 
-The IndexManager is the component that provides access to the search index. It allows to index, retrieve
-and search for documents. Documents are dictionaries (a set of keys/values) that are scoped to a namespace.
+The `IndexManager` is the component that provides access to the search index. It allows to index, to retrieve
+and to search for documents. Documents are dictionaries (a set of key/value fields) that are scoped to a namespace.
 
-The IndexManager is a file-system based index. In order to support multiple languages, it creates an
+The `IndexManager` is a file-system based index. In order to support multiple languages, it creates an
 index per-language. It means that documents in different languages will be physically stored in different
-indexes. It allows very efficient operations for inserting and searching for documents since the index does
+indexes. It provides very efficient operations for inserting and searching for documents since the index does
 not need to perform a range query to retrieve all documents for a language. This model penalizes searching
 for documents in different languages simultaneously.
 
-Before continue reading the following sections, we strongly recommend reading
-[Search and Scoring](https://lucene.apache.org/core/7_1_0/core/org/apache/lucene/search/package-summary.html#package.description)
-and [Classic Scoring Formula](https://lucene.apache.org/core/7_1_0/core/org/apache/lucene/search/similarities/TFIDFSimilarity.html)
-in Lucene documentation. This library uses the default scoring algorithm to match documents.
+You can use the `IndexManager.Builder` class to build and configure an `IndexManager`:
+
+```kotlin
+// This is the default configuration if you don't specify a different set of options.
+val indexManger: IndexManager = IndexManager.Builder("/tmp/lucene-index")
+  .forLanguages(Language.entries)
+  .withSimilarity(BM25Similarity())
+  .build()
+```
+
+Before reading the following sections, we strongly recommend reading
+[Search and Scoring](https://lucene.apache.org/core/9_1_0/core/org/apache/lucene/search/package-summary.html#package.description)
+and [Classic Scoring Formula](https://lucene.apache.org/core/9_1_0/core/org/apache/lucene/search/similarities/TFIDFSimilarity.html)
+in Lucene documentation. This library uses the default scoring algorithm to match documents (Okapi BM25).
 
 ### Documents
 
@@ -104,7 +114,7 @@ Mapper, the document schema is automatically created based on the annotations (l
 ```kotlin
 import be.rlab.search.query.*
 
-val indexManager = IndexManager("/tmp/lucene-index").apply {
+indexManager.apply {
     addSchema("players") {
         string("id")
         text("firstName")
@@ -176,8 +186,6 @@ The following examples create a new document within the _players_ namespace in t
 import be.rlab.nlp.model.Language
 import be.rlab.search.IndexManager
 
-val indexManager = IndexManager("/tmp/lucene-index")
-
 indexManager.index("players", Language.SPANISH) {
     string("id", "player-id-1234")
     text("firstName", "Juan")
@@ -220,7 +228,6 @@ data class Player(
     @IndexField(store = BoolValue.YES) val score: Float?
 )
 
-val indexManager = IndexManager("/tmp/lucene-index")
 val mapper = IndexMapper(indexManager)
 
 mapper.index(Player(
@@ -252,7 +259,7 @@ can ignore the schema definition.
 ```kotlin
 import be.rlab.search.query.*
 
-val indexManager = IndexManager("/tmp/lucene-index").apply {
+indexManager.apply {
     addSchema("players") {
         string("id")
         text("firstName")
@@ -278,7 +285,6 @@ indexManager.search("players", Language.SPANISH) {
 ```kotlin
 import be.rlab.search.query.*
 
-val indexManager = IndexManager("/tmp/lucene-index")
 val mapper = IndexMapper(indexManager)
 
 mapper.search<Player>(Language.SPANISH) {
@@ -329,8 +335,6 @@ is not supported, since the sorting criteria depends on the data type (look at t
 import be.rlab.nlp.model.Language
 import be.rlab.search.IndexManager
 
-val indexManager = IndexManager("/tmp/lucene-index")
-
 indexManager.index("players", Language.SPANISH) {
     string("id", "player-id-1234")
     text("firstName", "Juan")
@@ -366,7 +370,6 @@ data class Player(
     @IndexField(store = BoolValue.YES, docValues = true) val score: Float?
 )
 
-val indexManager = IndexManager("/tmp/lucene-index")
 val mapper = IndexMapper(indexManager)
 
 mapper.index(Player(
@@ -389,8 +392,6 @@ The ```QueryBuilder``` also supports parsing Lucene queries using the
 syntax.
 
 ```kotlin
-val indexManager = IndexManager("/tmp/lucene-index")
-
 indexManager.search("players", Language.SPANISH) {
     parse("firstName", "age:[22 TO 35] AND Juan")
 }
