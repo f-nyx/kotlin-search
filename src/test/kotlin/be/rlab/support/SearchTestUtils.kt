@@ -5,14 +5,18 @@ import be.rlab.nlp.model.Language
 
 object SearchTestUtils {
     fun firstWord(text: String, language: Language = Language.ENGLISH): String {
-        return Normalizer(text, language, stemming = false, removeStopWords = true)
+        return Normalizer.new(text, language)
+            .skipStemming()
+            .removeStopWords()
             .normalize()
             .split(" ")
             .first { word -> word.length > 3 }
     }
 
     fun lastWord(text: String, language: Language = Language.ENGLISH): String {
-        return Normalizer(text, language, stemming = false, removeStopWords = true)
+        return Normalizer.new(text, language)
+            .skipStemming()
+            .removeStopWords()
             .normalize()
             .split(" ")
             .reversed()

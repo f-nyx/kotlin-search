@@ -5,8 +5,8 @@ import java.text.Normalizer as JavaNormalizer
 
 /** String normalizer.
  *
- * By default it removes diacritics, applies the stemmer for the specified language, converts all terms to
- * lowercase, and joins the terms with a single space.
+ * By default, it removes diacritics, removes punctuation, applies the stemmer for the specified language,
+ * converts all terms to lowercase, and joins the terms with a single space.
  *
  * @param text Text to normalize.
  * @param language Text language.
@@ -18,16 +18,16 @@ import java.text.Normalizer as JavaNormalizer
  * @param stemming Indicates whether to apply the stemmer to each term.
  * @param joinWith String to join the terms.
  */
-data class Normalizer(
+class Normalizer(
     private val text: String,
-    private val language: Language,
-    private val caseSensitive: Boolean = false,
-    private val form: JavaNormalizer.Form = JavaNormalizer.Form.NFD,
-    private val removeDiacritics: Boolean = true,
-    private val removePunctuation: Boolean = true,
-    private val removeStopWords: Boolean = false,
-    private val stemming: Boolean = true,
-    private val joinWith: String = " "
+    private var language: Language? = null,
+    private var caseSensitive: Boolean = false,
+    private var form: JavaNormalizer.Form = JavaNormalizer.Form.NFD,
+    private var removeDiacritics: Boolean = true,
+    private var removePunctuation: Boolean = true,
+    private var removeStopWords: Boolean = false,
+    private var stemming: Boolean = true,
+    private var joinWith: String = " "
 ) {
     companion object {
         private val REGEX_UNACCENT: Regex = Regex("\\p{InCombiningDiacriticalMarks}+")
@@ -37,69 +37,63 @@ data class Normalizer(
          * @param language Text language.
          * @return a new normalizer.
          */
-        fun new(
-            text: String,
-            language: Language
-        ): Normalizer =
-            Normalizer(
-                text = text,
-                language = language
-            )
+        fun new(text: String, language: Language? = null): Normalizer = Normalizer(
+            text = text,
+            language = language
+        )
     }
 
-    /** Word tokenizer to split text into words. */
-    private val wordTokenizer = WordTokenizer(removePunctuation)
-    private val stopWordTokenizer =
-        StopWordTokenizer.new(language)
-    private val stemmer = MultiLanguageStemmer.new(language)
+    fun forLanguage(newLanguage: Language): Normalizer = apply {
+        language = newLanguage
+    }
 
-    fun caseSensitive(): Normalizer = copy(
-        caseSensitive = true
-    )
+    fun caseSensitive(isCaseSensitive: Boolean = true): Normalizer = apply {
+        caseSensitive = isCaseSensitive
+    }
 
-    fun caseInsensitive(): Normalizer = copy(
-        caseSensitive = false
-    )
+    fun caseInsensitive(isCaseSensitive: Boolean = false): Normalizer = apply {
+        caseSensitive = isCaseSensitive
+    }
 
-    fun form(form: JavaNormalizer.Form): Normalizer = copy(
-        form = form
-    )
+    fun form(newForm: JavaNormalizer.Form): Normalizer = apply {
+        form = newForm
+    }
 
-    fun removeDiacritics(): Normalizer = copy(
-        removeDiacritics = true
-    )
+    fun removeDiacritics(remove: Boolean = true): Normalizer = apply {
+        removeDiacritics = remove
+    }
 
-    fun keepDiacritics(): Normalizer = copy(
-        removeDiacritics = false
-    )
+    fun keepDiacritics(keep: Boolean = true): Normalizer = apply {
+        removeDiacritics = !keep
+    }
 
-    fun removeStopWords(): Normalizer = copy(
-        removeStopWords = true
-    )
+    fun removeStopWords(remove: Boolean = true): Normalizer = apply {
+        removeStopWords = remove
+    }
 
-    fun keepStopWords(): Normalizer = copy(
-        removeStopWords = false
-    )
+    fun keepStopWords(keep: Boolean = true): Normalizer = apply {
+        removeStopWords = !keep
+    }
 
-    fun removePunctuation(): Normalizer = copy(
-        removePunctuation = true
-    )
+    fun removePunctuation(remove: Boolean = true): Normalizer = apply {
+        removePunctuation = remove
+    }
 
-    fun keepPunctuation(): Normalizer = copy(
-        removePunctuation = false
-    )
+    fun keepPunctuation(keep: Boolean = true): Normalizer = apply {
+        removePunctuation = !keep
+    }
 
-    fun applyStemming(): Normalizer = copy(
-        stemming = true
-    )
+    fun applyStemming(apply: Boolean = true): Normalizer = apply {
+        stemming = apply
+    }
 
-    fun skipStemming(): Normalizer = copy(
+    fun skipStemming(): Normalizer = apply {
         stemming = false
-    )
+    }
 
-    fun joinWith(joinText: String): Normalizer = copy(
+    fun joinWith(joinText: String): Normalizer = apply {
         joinWith = joinText
-    )
+    }
 
     /** Applies normalizations and returns the normalized text.
      * @return a valid text.
@@ -119,18 +113,24 @@ data class Normalizer(
         if (!caseSensitive) {
             normalizedText = normalizedText.lowercase()
         }
+        /** Word tokenizer to split text into words. */
+        val wordTokenizer = WordTokenizer(removePunctuation)
 
-        normalizedText = wordTokenizer.tokenize(normalizedText.reader()).map { word ->
+        normalizedText = wordTokenizer.tokenize(normalizedText.reader()).joinToString(joinWith) { word ->
             word.toString()
-        }.joinToString(joinWith)
+        }
 
         if (removeStopWords) {
-            normalizedText = stopWordTokenizer.tokenize(normalizedText.reader())
-                .joinToString(joinWith) { word ->
-                    word.toString()
-                }
+            val stopWordTokenizer = StopWordTokenizer.new(requireNotNull(language) {
+                "language is required for the stop words tokenizer"
+            })
+            normalizedText = stopWordTokenizer.tokenize(normalizedText.reader()).joinToString(joinWith) { word ->
+                word.toString()
+            }
         }
+
         if (stemming) {
+            val stemmer = MultiLanguageStemmer.new(requireNotNull(language) { "language is required for the stemmer" })
             normalizedText = normalizedText.split(joinWith).joinToString(joinWith) { word ->
                 stemmer.stem(word)
             }

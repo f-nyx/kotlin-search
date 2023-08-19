@@ -39,7 +39,7 @@ class TextClassifier(
         text: String,
         language: Language
     ) {
-        val normalizedText: String = Normalizer(text, language = language)
+        val normalizedText: String = Normalizer.new(text, language = language)
             .applyStemming()
             .removeStopWords()
             .normalize()
@@ -89,7 +89,7 @@ class TextClassifier(
             wildcard(CATEGORY_FIELD, "*")
         }
 
-        val normalizedText: String = Normalizer(text, language)
+        val normalizedText: String = Normalizer.new(text, language)
             .applyStemming()
             .removeStopWords()
             .normalize()
@@ -98,9 +98,9 @@ class TextClassifier(
             val value: String = document[CATEGORY_FIELD]!!
             value
         }.map { (category, documents) ->
-            val distance: Float = documents.map { document ->
+            val distance: Float = documents.maxOfOrNull { document ->
                 jaroWinkler(document[TEXT_FIELD]!!, normalizedText)
-            }.maxOrNull() ?: 0.0F
+            } ?: 0.0F
 
             ClassificationResult(
                 assignedClass = category,

@@ -54,17 +54,6 @@ class LuceneIndex(
         return indexWriter.addDocument(map(document))
     }
 
-    /** Retrieves all documents for the specified search results.
-     * @param hits Search results.
-     * @return the documents from the search results.
-     */
-    fun getDocuments(hits: TopDocs): List<Document> {
-        val storedFields = indexReader.storedFields()
-        return hits.scoreDocs.map { hit ->
-            storedFields.document(hit.doc)
-        }.map { document -> map(document) }
-    }
-
     /** Retrieves a document by id.
      * @param documentId Id of the required document.
      * @return the required document, or null if it does not exist.
@@ -246,6 +235,17 @@ class LuceneIndex(
     private fun searcher(language: Language): IndexSearcher {
         logger.debug("creating index searcher for language: $language")
         return IndexSearcher(indexReader)
+    }
+
+    /** Retrieves all documents for the specified search results.
+     * @param hits Search results.
+     * @return the documents from the search results.
+     */
+    private fun getDocuments(hits: TopDocs): List<Document> {
+        val storedFields = indexReader.storedFields()
+        return hits.scoreDocs.map { hit ->
+            storedFields.document(hit.doc)
+        }.map { document -> map(document) }
     }
 
     private fun transform(topDocs: TopDocs): SearchResult {

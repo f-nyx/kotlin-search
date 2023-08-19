@@ -121,7 +121,7 @@ class QueryBuilder private constructor (
 
     fun normalizeIfRequired(value: String, normalize: Boolean = false): String {
         return if (normalize) {
-            Normalizer(value, language).normalize()
+            Normalizer.new(value, language).normalize()
         } else {
             value
         }

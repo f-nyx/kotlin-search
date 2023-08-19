@@ -10,7 +10,23 @@ to provide the following features:
 * Multi-language search index
 * Text normalization
 * Multi-language stemming and tokenization
-* Text classification
+
+## Table of Contents
+
+* [Dependency](#dependency)
+* [Multi-language search index](#multi-language-search-index)
+  * [Documents](#documents)
+  * [Documents Schemas](#documents-schemas)
+  * [Data Types](#data-types)
+  * [Indexing Documents](#indexing-documents)
+  * [Searching](#searching)
+  * [Sorting](#sorting)
+  * [Query Parser](#query-parser)
+  * [Pagination](#pagination)
+* [Text Normalization](#text-normalization)
+  * [Pre-normalization](#pre-normalization)
+  * [Tokenization](#tokenization)
+  * [Token Normalization](#token-normalization)
 
 ## Dependency
 
@@ -68,7 +84,7 @@ utility method to retrieve the language from the document's identifier.
 The document `namespace` emulates _domain collections_. All queries will be scoped to a `namespace`, which means
 that querying the index is analog to query a collection in a no-sql database.
 
-### Documents schemas
+### Documents Schemas
 
 Lucene fields have some attributes that are used in index-time to determine how the field is processed by the index.
 The `stored` attribute tells Lucene to store the field value in the index. The `indexed` attribute indicates that a
@@ -106,7 +122,7 @@ val indexManager = IndexManager("/tmp/lucene-index").apply {
 }
 ```
 
-### Data types
+### Data Types
 
 Lucene supports only a few native data types. The following table shows the default attributes for each data type.
 
@@ -144,7 +160,7 @@ You can take a look at the
 and [ListTypeMapper](https://github.com/f-nyx/kotlin-search/blob/master/src/main/kotlin/be/rlab/search/mapper/ListTypeMapper.kt)
 components for further information.
 
-### Indexing documents
+### Indexing Documents
 
 _kotlin-search_ provides two strategies to index documents, a functional DSL and an object mapper. In order to keep
 backward-compatibility with older versions, the functional DSL and object mapper strategies cannot be mixed. If
@@ -276,7 +292,7 @@ Both the functional DSL and the object mapper supports the following type of que
 | Query type | Field types  |  Default boolean clause
 |------------|--------------|-------------------------
 |   term     | all          |  MUST
-|   range    | numeric      |  SHOULD
+|   range    | all          |  SHOULD
 |  wildcard  | string, text |  MUST
 |   regex    | string, text |  MUST
 |   fuzzy    | string, text |  MUST
@@ -366,7 +382,7 @@ mapper.search<Player>(Language.SPANISH) {
 }
 ```
 
-### Query parsing
+### Query Parser
 
 The ```QueryBuilder``` also supports parsing Lucene queries using the
 [QueryParser](https://lucene.apache.org/core/8_0_0/queryparser/org/apache/lucene/queryparser/classic/QueryParser.html)
@@ -395,3 +411,45 @@ you have to defer the search in order to continue later.
 
 If you don't need a deferred pagination, you can use ```indexManager.find``` to get the full list of results as
 a Sequence. It will query the index as many times as required until the recordset has no more documents.
+
+## Text Normalization
+
+Text normalization is a key part on indexing and searching. Lucene applies a set of text normalization techniques to
+make the search more accurate.
+
+_kotlin-search_ provides access to the text normalization components through the `be.rlab.nlp.Normalizer` class.
+The text normalization usually has three stages:
+
+1. Pre-normalization
+2. Tokenization
+3. Token Normalization
+
+### Pre-normalization
+
+In this phase, the `Normalizer` applies the following normalization techniques to the entire text:
+
+* Removes diacritics
+* Removes punctuation
+* Performs [Unicode normalization](http://www.unicode.org/unicode/reports/tr15/tr15-23.html)
+* Transforms the text to lowercase to make it case insensitive
+
+### Tokenization
+
+In this phase, the `Normalizer` split the text into tokens using the following tokenizers:
+
+* Word Tokenizer
+* Stop Words Tokenizer
+
+Note that the language is required for the Stop Words Tokenizer, since stop words are language-specific. If you
+created the `Normalizer` without setting a language, it will fail with an error.
+
+The Stop Words Tokenizer uses the collection of stop words from [stopwords-iso](https://github.com/stopwords-iso).
+
+### Token Normalization
+
+In this phase, the `Normalizer` applies the Snowball stemmer to extract the root from the words. The stemming is
+provided by the `be.rlab.nlp.MultiLanguageStemmer` component. It delegates the processing to the language-specific
+stemmer distributed by Lucene.
+
+Note that the language is required for the `MultiLanguageStemmer`. If you created the `Normalizer` without setting a
+language, it will fail with an error.

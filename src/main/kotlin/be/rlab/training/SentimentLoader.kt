@@ -39,12 +39,10 @@ class SentimentLoader(
             "michigan-lexicons-full.es.csv"
         ) to { record ->
             val sentiment: String = record[2].value
-            val value: String = Normalizer(
-                text = record[0].value,
-                language = SPANISH,
-                removeStopWords = true,
-                stemming = false
-            ).normalize()
+            val value: String = Normalizer.new(text = record[0].value, language = SPANISH)
+                .removeStopWords()
+                .skipStemming()
+                .normalize()
 
             text(VALUE_FIELD, value)
 
@@ -58,12 +56,10 @@ class SentimentLoader(
             "sentistrength-1600_tweets_dev_complete.es.csv",
             "sentistrength-1600_tweets_test_average_complete.es.tsv"
         ) to { record ->
-            val value: String = Normalizer(
-                text = record[2].value,
-                language = SPANISH,
-                removeStopWords = true,
-                stemming = false
-            ).normalize()
+            val value: String = Normalizer.new(text = record[2].value, language = SPANISH)
+                .removeStopWords()
+                .skipStemming()
+                .normalize()
 
             text(VALUE_FIELD, value)
             addSentiment(negative = record[1].value.toInt(), positive = record[0].value.toInt())

@@ -7,12 +7,12 @@ import java.util.*
 /** Utility to generate and read hashes.
  */
 object Hashes {
-    private val languageHashes: Map<Language, String> = Language.values().map { language ->
-        language to Integer.toHexString(MurmurHash3.hash32(language.name)).padStart(8, '0')
-    }.toMap()
-    private val reverseLanguageHashes: Map<String, Language> = Language.values().map { language ->
-        Integer.toHexString(MurmurHash3.hash32(language.name)).padStart(8, '0') to language
-    }.toMap()
+    private val languageHashes: Map<Language, String> = Language.entries.associateWith { language ->
+        Integer.toHexString(MurmurHash3.hash32(language.name)).padStart(8, '0')
+    }
+    private val reverseLanguageHashes: Map<String, Language> = Language.entries.associateBy { language ->
+        Integer.toHexString(MurmurHash3.hash32(language.name)).padStart(8, '0')
+    }
 
     /** Generates a non-cryptographic, language-dependant hash to represent unique identifiers.
      * It uses a combination of murmur3 hashes over the language, the id and the current time.
