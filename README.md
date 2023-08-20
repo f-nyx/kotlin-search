@@ -40,7 +40,7 @@ This is available on Maven Central Repository. It can be added using the followi
 </dependency>
 ```
 
-This version supports Kotlin 1.7 and Lucene 9.
+This version supports Kotlin 1.9 and Lucene 9.
 
 The only two hard dependencies are SLF4j and commons-codec. We will not add more dependencies unless it's strictly
 necessary to avoid classpath errors.
