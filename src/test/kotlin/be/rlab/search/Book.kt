@@ -1,15 +1,19 @@
 package be.rlab.search
 
-import be.rlab.nlp.model.Language
-import be.rlab.search.annotation.*
+import be.rlab.search.annotation.IndexDocument
+import be.rlab.search.annotation.IndexField
+import be.rlab.search.annotation.IndexFieldType
+import be.rlab.search.model.BoolValue
 import be.rlab.search.model.FieldType
 
-@IndexDocument(namespace = IndexManagerTest.NAMESPACE, languages = [Language.SPANISH, Language.ENGLISH])
+@IndexDocument(namespace = IndexManagerTest.NAMESPACE)
 data class Book(
-    @IndexField @IndexFieldType(FieldType.STRING) val id: String,
-    @IndexField @Indexed val hash: Int,
-    @IndexField @Stored(false) val title: String?,
+    @IndexField val id: String,
+    @IndexField(store = BoolValue.NO, index = BoolValue.YES) val title: String?,
     @IndexField val description: String,
-    @IndexField val category: String,
-    @IndexField val authorName: String
+    @IndexField(docValues = true) @IndexFieldType(FieldType.TEXT) val genre: String,
+    @IndexField @IndexFieldType(FieldType.TEXT) val categories: List<String>,
+    @IndexField val author: String,
+    @IndexField(store = BoolValue.YES) val hash: Int,
+    @IndexField(store = BoolValue.YES, index = BoolValue.YES) val rate: Float
 )

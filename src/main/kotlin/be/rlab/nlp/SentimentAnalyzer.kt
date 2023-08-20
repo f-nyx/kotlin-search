@@ -34,12 +34,10 @@ class SentimentAnalyzer(
         text: String,
         language: Language
     ): SentimentResult {
-        val words: Map<String, Int> = Normalizer(
+        val words: Map<String, Int> = Normalizer.new(
             text = text,
             language = language,
-            removeStopWords = true,
-            stemming = false
-        ).normalize().split(" ").map { word ->
+        ).removeStopWords().skipStemming().normalize().split(" ").associateWith { word ->
             val score: Int = indexManager.find(NAMESPACE, language) {
                 term(VALUE_FIELD, word)
             }.fold(0) { score, doc ->
@@ -49,8 +47,8 @@ class SentimentAnalyzer(
                 score + positive - negative
             }
 
-            word to score
-        }.toMap()
+            score
+        }
         val negativeCount: Int = words.values.count { value ->
             value < 0
         }

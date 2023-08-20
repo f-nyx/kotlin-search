@@ -12,8 +12,7 @@ data class Document(
     /** Document namespace that represents this collection. */
     val namespace: String,
     /** List of fields */
-    val fields: List<Field>,
-
+    val fields: List<Field<*>>,
     /** Document version, used to keep backward compatibility between releases. */
     val version: String
 ) {
@@ -21,7 +20,7 @@ data class Document(
         fun new(
             id: String,
             namespace: String,
-            fields: List<Field>,
+            fields: List<Field<*>>,
             version: String
         ): Document =
             Document(
@@ -34,7 +33,7 @@ data class Document(
         fun new(
             namespace: String,
             language: Language,
-            fields: List<Field>,
+            fields: List<Field<*>>,
             version: String
         ): Document =
             Document(
@@ -45,9 +44,22 @@ data class Document(
             )
     }
 
-    inline operator fun<reified T> get(name: String): T? {
+    @Suppress("UNCHECKED_CAST")
+    fun getValues(fieldName: String): List<Any>? {
         return fields.find { field ->
+            field.name == fieldName
+        }?.let { field -> field.values as List<Any> }
+    }
+
+    inline operator fun<reified T> get(name: String): T? {
+        val field = fields.find { field ->
             field.name == name
-        }?.value as T
+        }
+        val targetClass = T::class
+        return if (targetClass == List::class) {
+            field?.values as T?
+        } else {
+            field?.values?.firstOrNull() as T?
+        }
     }
 }

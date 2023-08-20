@@ -2,13 +2,10 @@ package be.rlab.search.model
 
 import be.rlab.nlp.Normalizer
 import be.rlab.nlp.model.Language
+import be.rlab.search.LuceneFieldUtils.privateField
 import be.rlab.search.LuceneIndex.Companion.NAMESPACE_FIELD
-import be.rlab.search.LuceneIndex.Companion.PRIVATE_FIELD_PREFIX
 import be.rlab.search.query.term
-import org.apache.lucene.search.BooleanClause
-import org.apache.lucene.search.BooleanQuery
-import org.apache.lucene.search.BoostQuery
-import org.apache.lucene.search.Query
+import org.apache.lucene.search.*
 import kotlin.reflect.KProperty1
 
 /** Builder to create Lucene [Query]s.
@@ -26,25 +23,18 @@ class QueryBuilder private constructor (
             val builder = QueryBuilder(language, fields = emptyList())
 
             return builder.apply {
-                term(NAMESPACE_FIELD, namespace, normalize = false)
+                term(privateField(NAMESPACE_FIELD), namespace, normalize = false)
             }
         }
 
         fun forSchema(
-            schema: DocumentSchema<*>,
+            schema: DocumentSchema,
             language: Language
-        ): QueryBuilder =
-            forSchema(schema, language, "$PRIVATE_FIELD_PREFIX$NAMESPACE_FIELD")
-
-        internal fun forSchema(
-            schema: DocumentSchema<*>,
-            language: Language,
-            namespaceField: String
         ): QueryBuilder {
             val builder = QueryBuilder(language, fields = schema.fields)
 
             return builder.apply {
-                term(namespaceField, schema.namespace, normalize = false)
+                term(privateField(NAMESPACE_FIELD), schema.namespace, normalize = false)
             }
         }
     }
@@ -63,9 +53,18 @@ class QueryBuilder private constructor (
     }
 
     private var root: BooleanQuery.Builder = BooleanQuery.Builder()
+    private val sortFields: MutableList<SortField> = mutableListOf()
 
     fun build(): Query {
         return root.build()
+    }
+
+    fun sort(): Sort? {
+        return if (sortFields.isNotEmpty()) {
+            Sort(*sortFields.toTypedArray())
+        } else {
+            null
+        }
     }
 
     fun findByField(
@@ -87,8 +86,9 @@ class QueryBuilder private constructor (
     ): QueryBuilder = apply {
         require(fields.isNotEmpty()) { "QueryBuilder does not support search by multiple fields" }
 
-        val field = fields.find { field -> field.propertyName == property.name }
-            ?: throw RuntimeException("property '${property.name}' not annotated with @IndexField")
+        val field = requireNotNull(getFieldSchema(property.name)) {
+            "property '${property.name}' not annotated with @IndexField"
+        }
 
         root.add(withModifiers(
             builder(field),
@@ -121,10 +121,25 @@ class QueryBuilder private constructor (
 
     fun normalizeIfRequired(value: String, normalize: Boolean = false): String {
         return if (normalize) {
-            Normalizer(value, language).normalize()
+            Normalizer.new(value, language).normalize()
         } else {
             value
         }
+    }
+
+    /** Returns a field schema by name or by property name.
+     * @param name Field name or property name.
+     * @return the required schema, if exists.
+     */
+    fun getFieldSchema(name: String): FieldSchema? {
+        return fields.find { field -> field.name == name || field.propertyName == name }
+    }
+
+    /** Adds a sorting criteria to the list of existing criteria.
+     * @param sortField Sorting criteria.
+     */
+    fun addSortField(sortField: SortField): QueryBuilder = apply {
+        sortFields += sortField
     }
 
     private fun withModifiers(
