@@ -36,7 +36,7 @@ This is available on Maven Central Repository. It can be added using the followi
 <dependency>
     <groupId>be.rlab</groupId>
     <artifactId>kotlin-search</artifactId>
-    <version>1.4.0</version>
+    <version>1.4.1</version>
 </dependency>
 ```
 
