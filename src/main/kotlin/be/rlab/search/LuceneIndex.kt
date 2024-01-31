@@ -156,7 +156,7 @@ class LuceneIndex(
      * @param luceneDoc Lucene document to map.
      * @return The Document object.
      */
-    fun map(luceneDoc: LuceneDocument): Document {
+    fun map(luceneDoc: LuceneDocument, score: Float = 0.0f): Document {
         val version: String = luceneDoc.getField(privateField(VERSION_FIELD)).stringValue() ?: "1"
         val id: String = luceneDoc.getField(privateField(ID_FIELD, version)).stringValue()
 
@@ -199,7 +199,8 @@ class LuceneIndex(
                     fieldsMap[field.name()] = fieldsMap.getValue(field.name()).addValues(listOf(value))
                 }
                 fieldsMap
-            }.values.toList()
+            }.values.toList(),
+            score = score
         )
     }
 
@@ -247,8 +248,8 @@ class LuceneIndex(
     private fun getDocuments(hits: TopDocs): List<Document> {
         val storedFields = indexReader.storedFields()
         return hits.scoreDocs.map { hit ->
-            storedFields.document(hit.doc)
-        }.map { document -> map(document) }
+            hit.score to storedFields.document(hit.doc)
+        }.map { (score, document) -> map(document, score) }
     }
 
     private fun transform(topDocs: TopDocs): SearchResult {

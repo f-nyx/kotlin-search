@@ -14,33 +14,38 @@ data class Document(
     /** List of fields */
     val fields: List<Field<*>>,
     /** Document version, used to keep backward compatibility between releases. */
-    val version: String
+    val version: String,
+    val score: Float
 ) {
     companion object {
         fun new(
             id: String,
             namespace: String,
             fields: List<Field<*>>,
-            version: String
+            version: String,
+            score: Float = 0.0f
         ): Document =
             Document(
                 id = id,
                 namespace = namespace,
                 fields = fields,
-                version = version
+                version = version,
+                score = score
             )
 
         fun new(
             namespace: String,
             language: Language,
             fields: List<Field<*>>,
-            version: String
+            version: String,
+            score: Float = 0.0f
         ): Document =
             Document(
                 id = generateId(UUID.randomUUID(), language),
                 namespace = namespace,
                 fields = fields,
-                version = version
+                version = version,
+                score = score
             )
     }
 
