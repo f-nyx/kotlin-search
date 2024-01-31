@@ -49,9 +49,14 @@ class IndexManager(
     class Builder(private val indexPath: String) {
         private var similarity: Similarity = BM25Similarity()
         private var supportedLanguages: List<Language> = Language.entries
+        private var analyzerFactory: AnalyzerFactory = DefaultAnalyzerFactory
 
         fun withSimilarity(newSimilarity: Similarity): Builder = apply {
             similarity = newSimilarity
+        }
+
+        fun withAnalyzerFactory(newAnalyzerFactory: AnalyzerFactory): Builder = apply {
+            analyzerFactory = newAnalyzerFactory
         }
 
         fun forLanguages(languages: List<Language>): Builder = apply {
@@ -61,7 +66,8 @@ class IndexManager(
         fun build(): IndexManager {
             return IndexManager(indexPath, IndexConfig.new(
                 supportedLanguages = supportedLanguages,
-                similarity = similarity
+                similarity = similarity,
+                analyzerFactory = analyzerFactory
             ))
         }
     }
@@ -69,7 +75,7 @@ class IndexManager(
     /** Indexes per language. */
     private val indexes: MutableMap<Language, LuceneIndex> = indexConfig.supportedLanguages.associateWith { language ->
         val indexDir: Directory = FSDirectory.open(File(indexPath, language.name.lowercase()).toPath())
-        val analyzer: Analyzer = AnalyzerFactory.newAnalyzer(language)
+        val analyzer: Analyzer = indexConfig.analyzerFactory.newAnalyzer(language)
         val indexWriter = IndexWriter(indexDir, IndexWriterConfig(analyzer)).apply {
             commit()
         }
